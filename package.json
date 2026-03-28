@@ -1,0 +1,25 @@
+{
+  "name": "algorimed-engine",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "15.1.11",
+    "react": "19.0.3",
+    "react-dom": "19.0.3",
+    "jspdf": "2.5.2",
+    "jspdf-autotable": "3.8.3",
+    "js-cookie": "3.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "19.0.3",
+    "@types/react-dom": "19.0.3",
+    "@types/js-cookie": "^3.0.6",
+    "typescript": "^5"
+  }
+}
