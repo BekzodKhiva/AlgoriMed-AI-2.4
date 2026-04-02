@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { analyze } from '@/lib/engine';
 import { ClinicalInput } from '@/lib/types';
 
-const SHEETS_URL = process.env.GOOGLE_SHEETS_WEBHOOK_URL ?? '';
+// ✅ Yangi Google Apps Script URL
+const APPS_SCRIPT_URL =
+  process.env.GOOGLE_SHEETS_WEBHOOK_URL ??
+  'https://script.google.com/macros/s/AKfycbyydQg8FuxzjdWWst4QBjtG_CU7s9dVVAJkUvDvswU6rfy0kLKO0qP7zYVjQzhUWJCL/exec';
 
 const TRAUMA_UZ: Record<string, string> = {
   fall_height:   'Balandlikdan yiqilish',
@@ -20,6 +23,15 @@ const DECISION_UZ: Record<string, string> = {
   SURGICAL_EVALUATION: 'KRITIK',
 };
 
+const CT_UZ: Record<string, string> = {
+  not_done:  'Bajarilmagan',
+  normal:    'Normal',
+  hematoma:  'Gematoma',
+  contusion: 'Kontuziya',
+  fracture:  'Suyak sinishi',
+  other:     'Boshqa',
+};
+
 const HEMATOMA_UZ: Record<string, string> = {
   epidural:      'epidural',
   subdural:      'subdural',
@@ -28,15 +40,16 @@ const HEMATOMA_UZ: Record<string, string> = {
 };
 
 async function sendToSheets(payload: Record<string, unknown>) {
-  if (!SHEETS_URL) return;
   try {
-    // URL parametrlar orqali yuborish (GET) — Google Apps Script bilan 100% ishlaydi
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(payload)) {
       params.append(key, String(value ?? ''));
     }
-    const url = `${SHEETS_URL}?${params.toString()}`;
-    await fetch(url, { method: 'GET' });
+    const url = `${APPS_SCRIPT_URL}?${params.toString()}`;
+    const res = await fetch(url, { method: 'GET', redirect: 'follow' });
+    if (!res.ok) {
+      console.error('Google Sheets webhook xatosi:', res.status, await res.text());
+    }
   } catch (err) {
     console.error('Google Sheets webhook xatosi:', err);
   }
@@ -47,9 +60,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const input: ClinicalInput & {
       otherMechanismLabel?: string;
-      doctorName?: string;
-      doctorRole?: string;
-      hospital?:   string;
+      doctorName?:          string;
+      doctorRole?:          string;
+      hospital?:            string;
     } = body;
 
     if (!input.age || !input.sex || !input.gcs) {
@@ -68,31 +81,51 @@ export async function POST(req: NextRequest) {
     const result  = analyze(input);
     const elapsed = Math.round((Date.now() - startMs) / 1000);
 
+    const now    = new Date();
+    const sana   = `${String(now.getDate()).padStart(2,'0')}.${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()}`;
+    const gcsStr = `${result.gcsTotal} (${input.gcs.eye}+${input.gcs.verbal}+${input.gcs.motor})`;
     const hematomaType = input.hematomaType
       ? (HEMATOMA_UZ[input.hematomaType] ?? input.hematomaType)
       : '';
+    const triggerCount =
+      (result.breakdown.cchr.rules.length    ?? 0) +
+      (result.breakdown.gcs.rules.length     ?? 0) +
+      (result.breakdown.btf.rules.length     ?? 0) +
+      (result.breakdown.nice.rules.length    ?? 0) +
+      (result.breakdown.alcohol.rules.length ?? 0);
 
+    // Google Sheets ga yuborish (background, non-blocking)
     sendToSheets({
-      shifokor_ismi:      input.doctorName ?? '',
+      shifokor_ismi:      input.doctorName      ?? '',
+      shifokor_roli:      input.doctorRole      ?? '',
+      shifoxona:          input.hospital        ?? '',
+      sana,
       yosh:               input.age,
       jins:               input.sex === 'male' ? 'Erkak' : 'Ayol',
       mexanizm:           TRAUMA_UZ[input.traumaMechanism] ?? input.traumaMechanism,
+      gcs:                gcsStr,
       gcs_eye:            input.gcs.eye,
       gcs_verbal:         input.gcs.verbal,
       gcs_motor:          input.gcs.motor,
-      sbp_mmhg:           input.sbp ?? '',
-      spo2_foiz:          input.spO2 ?? '',
-      nafas_tezligi:      input.respiratoryRate ?? '',
-      rts_ball:           result.rtsScore ?? '',
-      politravma:         result.hasPolytrauma ? (result.polytravmaZones?.join(', ') ?? 'Ha') : 'Yoq',
-      kt_natijasi:        input.ctResult ?? 'not_done',
-      hematoma_type:      hematomaType,
-      gematoma_ml:        input.hematomaVolume ?? '',
-      siljish_mm:         input.midlineShift   ?? '',
-      antikoagulyant:     input.anticoagulant ? 'Ha' : 'Yoq',
+      sbp_mmhg:           input.sbp              ?? '',
+      spo2_foiz:          input.spO2             ?? '',
+      nafas_tezligi:      input.respiratoryRate  ?? '',
+      rts_ball:           result.rtsScore        ?? '',
+      kt_natijasi:        CT_UZ[input.ctResult]  ?? input.ctResult,
+      hematoma_turi:      hematomaType,
+      gematoma_ml:        input.hematomaVolume   ?? '',
+      gematoma_qalinligi: input.hematomaThickness ?? '',
+      siljish_mm:         input.midlineShift     ?? '',
+      antikoagulyant:     input.anticoagulant      ? 'Ha' : "Yo'q",
+      alkogol:            input.alcoholIntoxication ? 'Ha' : "Yo'q",
+      politravma:         result.hasPolytrauma
+                            ? (result.polytravmaZones?.join(', ') ?? 'Ha')
+                            : "Yo'q",
       algorimed_xulosasi: DECISION_UZ[result.decision] ?? result.decision,
-      trigger_soni:       result.reasons?.length ?? 0,
       xavf_darajasi:      DECISION_UZ[result.decision] ?? result.decision,
+      xavf_bali:          result.score,
+      ishonch_darajasi:   result.confidence,
+      trigger_soni:       triggerCount,
       qaror_vaqti_sek:    elapsed > 0 ? elapsed : '',
       izoh:               '',
     });
