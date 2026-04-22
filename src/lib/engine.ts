@@ -344,6 +344,72 @@ export function analyze(
     }
   }
 
+  // ── KONTUZIYA (BTF 2016) ──────────────────────────────────────────────
+  if (input.ctResult === 'contusion') {
+    btfScore = Math.max(btfScore, 50);
+    hematomaSurgery = hematomaSurgery ?? 'repeat_ct';
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
+    btfRules.push({
+      id: 'BTF-CONT', name: 'Miya kontuziyasi', protocol: 'BTF', riskLevel: 'medium',
+      description: "Miya kontuziyasi — 6–12 soatdan keyin KT takrorlash tavsiya etiladi (BTF 2016)",
+      weight: 0.50
+    });
+    xaiEntries.push({
+      fact:   "KT natijasi: Miya kontuziyasi",
+      effect: "Birlamchi miya to'qimasi zararlangan — ikkilamchi shish va qon ketish xavfi mavjud",
+      impact: "6–12 soatdan keyin KT takrorlash zarur; o'lcham oshishi jarrohlik ko'rsatmasi bo'lishi mumkin",
+      source: "BTF 2016, ACS TQIP 2023"
+    });
+    // Kombinatsiya: Kontuziya + GCS <= 8 → jarrohlik baholash zarur
+    if (gcsTotal <= 8) {
+      btfScore = Math.max(btfScore, 85);
+      hematomaSurgery = 'surgery_required';
+      surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+      btfRules.push({
+        id: 'BTF-CONT-GCS', name: 'Kontuziya + GCS ≤ 8', protocol: 'BTF', riskLevel: 'high',
+        description: `Miya kontuziyasi + GCS ${gcsTotal} ≤ 8 — neyrojarrohlik baholash zarur (BTF 2016)`,
+        weight: 0.85
+      });
+    }
+    // Kombinatsiya: Kontuziya + antikoagulyant → kechikkan qon ketish xavfi
+    if (input.anticoagulant) {
+      btfScore = Math.max(btfScore, 70);
+      surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+      btfRules.push({
+        id: 'BTF-CONT-AC', name: 'Kontuziya + Antikoagulyant', protocol: 'BTF', riskLevel: 'high',
+        description: "Miya kontuziyasi + antikoagulyant — kechikkan qon ketish xavfi yuqori, reversal ko'rib chiqilsin (BTF 2016)",
+        weight: 0.70
+      });
+    }
+  }
+
+  // ── SUYAK SINISHI (BTF 2016) ──────────────────────────────────────────
+  if (input.ctResult === 'fracture') {
+    btfScore = Math.max(btfScore, 40);
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
+    btfRules.push({
+      id: 'BTF-FRAC', name: 'Bosh suyagi sinishi', protocol: 'BTF', riskLevel: 'medium',
+      description: "Bosh suyagi sinishi KT da — neyrojarroh konsultatsiyasi tavsiya etiladi (BTF 2016)",
+      weight: 0.40
+    });
+    xaiEntries.push({
+      fact:   "KT natijasi: Bosh suyagi sinishi",
+      effect: "Mexanik buzilish — ostidagi miya to'qimasi va qon tomirlari zararlangan bo'lishi mumkin",
+      impact: "Neyrojarroh konsultatsiyasi zarur; asos suyagi sinishi belgilari bo'lsa — DARHOL baholash",
+      source: "BTF 2016, CCHR Lancet 2001"
+    });
+    // Kombinatsiya: Suyak sinishi + asos suyagi belgilari (basalSkullFracture)
+    if (input.cchrAdditional.basalSkullFracture) {
+      btfScore = Math.max(btfScore, 65);
+      surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+      btfRules.push({
+        id: 'BTF-FRAC-BASE', name: 'Asos suyagi sinishi', protocol: 'BTF', riskLevel: 'high',
+        description: "Asos suyagi sinishi (Battle belgisi / Raccoon eyes / CSF oqishi) — neyrojarroh DARHOL (BTF 2016)",
+        weight: 0.65
+      });
+    }
+  }
+
   // CN IV / VI — ko'z harakat buzilishi → ICP oshishi (K24)
   if (input.cranialNerves?.cn4 === 'P' || input.cranialNerves?.cn6 === 'P') {
     btfScore = Math.max(btfScore, 70);
@@ -390,7 +456,14 @@ export function analyze(
   const niceRules: TriggeredRule[] = [];
   let   niceScore = 0;
 
-  if (input.age >= 65) { niceScore += 25; }
+  if (input.age >= 65) {
+    niceScore += 25;
+    niceRules.push({
+      id: 'NICE-AGE', name: 'Yosh 65+', protocol: 'NICE', riskLevel: 'high',
+      description: "Bemor yoshi 65 va undan katta — NICE CG176 bo'yicha KT tavsiya etiladi",
+      weight: 0.25
+    });
+  }
   if (input.anticoagulant) {
     niceScore += 25;
     niceRules.push({ id: 'NICE-1', name: 'NICE Antikoagulyant', protocol: 'NICE', riskLevel: 'high', description: "Antikoagulyant terapiya — qon ketish xavfi yuqori (EFNS, Cohen 2006)", weight: 0.25 });
@@ -737,7 +810,7 @@ export function analyze(
   // ── POLITRAVMA TAKTIKASI ──────────────────────────────────────────────
   if (hasPolytrauma) {
     treatmentTactics.push(
-      `Politravma (${polytravmaZones.join(', ')}) — cABCDE Primary Survey to'liq bajarilishini ko'rib chiqing (WSES 2019)`
+      `Qo'shimcha jarohatlar (${polytravmaZones.join(', ')}) — cABCDE Primary Survey to'liq bajarilishini ko'rib chiqing (WSES 2019)`
     );
   }
   if (input.complaints?.chestPain && hasSpO2 && spO2 < 94) {
@@ -765,6 +838,12 @@ export function analyze(
     treatmentTactics.push("Antikoagulyant + CT normal: 24 soat yotqizish ko'rib chiqilsin — kechikkan qon ketish xavfi (Cohen 2006)");
   if (input.anticoagulant && input.ctResult === 'hematoma')
     treatmentTactics.push("Antikoagulyant + gematoma: reversal terapiya ko'rib chiqilsin (warfarin → 4F-PCC; DOAC → idarucizumab/andexanet)");
+  if (input.anticoagulant && input.ctResult === 'contusion')
+    treatmentTactics.push("Antikoagulyant + kontuziya: reversal terapiyani ko'rib chiqing — kechikkan qon ketish xavfi (BTF 2016, Cohen 2006)");
+  if (input.ctResult === 'contusion')
+    treatmentTactics.push("Miya kontuziyasi: 6–12 soatdan keyin KT takrorlashni ko'rib chiqing — o'lcham oshishi kuzatilsin (BTF 2016)");
+  if (input.ctResult === 'fracture')
+    treatmentTactics.push("Bosh suyagi sinishi: neyrojarroh konsultatsiyasini ko'rib chiqing; agar asos suyagi belgilari bo'lsa — DARHOL (BTF 2016)");
   if (gcsTotal <= 8 && input.ctResult === 'normal')
     treatmentTactics.push("GCS <= 8 + CT normal: Diffuz Aksonal Jarohat (DAJ) ehtimoli — MRI buyurishni ko'rib chiqing (ACS TQIP 2023)");
   if ((input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness) && input.ctResult === 'normal')
