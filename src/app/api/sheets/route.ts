@@ -37,7 +37,9 @@ function ctLabel(ct: string): string {
   return map[ct] ?? ct;
 }
 
-// POST — result sahifasidan chaqiriladi
+// POST — faqat manual / admin chaqiruv uchun
+// MUHIM: analyze/route.ts allaqachon Sheets ga yozadi (sendToSheets orqali).
+// result/page.tsx bu routeni CHAQIRMASLIGI kerak — aks holda bir bemor ikki marta logga tushadi.
 export async function POST(req: NextRequest) {
   try {
     const { result, input, doctorName, decisionTimeSeconds } = await req.json();

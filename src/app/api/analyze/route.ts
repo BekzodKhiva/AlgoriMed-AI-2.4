@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
       siljish_mm:         input.midlineShift     ?? '',
       antikoagulyant:     input.anticoagulant      ? 'Ha' : "Yo'q",
       alkogol:            input.alcoholIntoxication ? 'Ha' : "Yo'q",
-      politravma:         result.hasPolytrauma
+      qoshimcha_jarohat:  result.hasPolytrauma
                             ? (result.polytravmaZones?.join(', ') ?? 'Ha')
                             : "Yo'q",
       algorimed_xulosasi: DECISION_UZ[result.decision] ?? result.decision,
