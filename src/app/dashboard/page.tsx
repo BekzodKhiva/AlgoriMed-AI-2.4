@@ -25,7 +25,7 @@ interface SavedResult {
 const DECISION_UZ: Record<string, string> = {
   NO_CT_REQUIRED: 'KT talab etilmaydi',
   CT_RECOMMENDED: 'KT tavsiya etiladi',
-  CT_REQUIRED: 'KT zarur',
+  CT_REQUIRED: 'KT tavsiya etiladi',
   IMMEDIATE_CT: 'Shoshilinch KT',
   SURGICAL_EVALUATION: 'Jarrohlik baholash',
 };

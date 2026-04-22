@@ -408,7 +408,7 @@ export default function AnalyzePage() {
                     ))}
                   </div>
                   {form.anisocoria !== 'none' && (
-                    <span className={styles.hintDanger}>⚠️ Anizokoria — transtentorial herniatsiya ehtimoli. FAVQULODDA neyrojarrohlik baholash + shoshilinch KT zarur</span>
+                    <span className={styles.hintDanger}>⚠️ Anizokoria — transtentorial herniatsiya ehtimoli. Neyrojarrohlik baholash + shoshilinch KT tavsiya etiladi</span>
                   )}
                 </div>
                 <div className={styles.field} style={{ marginTop: 14 }}>
@@ -436,7 +436,7 @@ export default function AnalyzePage() {
                     borderColor: hasCNEmergency ? '#A32D2D' : hasCNHigh ? '#993C1D' : '#854F0B',
                     color: hasCNEmergency ? '#A32D2D' : hasCNHigh ? '#993C1D' : '#854F0B',
                   }}>
-                    {hasCNEmergency ? '🚨 FAVQULODDA' : hasCNHigh ? '⚠️ YUQORI XAVF' : '⚠️ Kuzatish kerak'} — CN {pathoCN.map(n => n.num).join(', ')} patologik
+                    {hasCNEmergency ? '🚨 FAVQULODDA' : hasCNHigh ? '⚠️ YUQORI XAVF' : '⚠️ Kuzatish tavsiya etiladi'} — CN {pathoCN.map(n => n.num).join(', ')} patologik
                   </div>
                 )}
                 <div className={styles.cnGrid}>
