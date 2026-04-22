@@ -26,16 +26,16 @@ const DECISION_UZ_CT_DONE: Record<string, string> = {
 const DECISION_DESC: Record<string, string> = {
   NO_CT_REQUIRED:      "Hozirgi klinik ko'rsatkichlar asosida KT skanini bajarish talab etilmaydi.",
   CT_RECOMMENDED:      'Ehtiyot chorasi sifatida KT bajarish tavsiya etiladi.',
-  CT_REQUIRED:         "Klinik ko'rsatmalar asosida KT skanini bajarish zarur.",
+  CT_REQUIRED:         "Klinik ko'rsatmalar asosida KT skanini bajarish tavsiya etiladi.",
   IMMEDIATE_CT:        'Kechiktirishsiz shoshilinch KT bajarish talab etiladi.',
-  SURGICAL_EVALUATION: 'Darhol neyrojarroh bilan maslahat va jarrohlik baholash zarur.',
+  SURGICAL_EVALUATION: 'Neyrojarroh bilan maslahat va jarrohlik baholash tavsiya etiladi.',
 };
 
 const DECISION_DESC_CT_DONE: Record<string, string> = {
   NO_CT_REQUIRED:      'KT bajarildi va natija normal. Kuzatish yetarli.',
   CT_RECOMMENDED:      'KT bajarildi. Dinamik nevrologik kuzatish tavsiya etiladi.',
-  CT_REQUIRED:         'KT bajarildi. Natijaga qarab nevrologik monitoring zarur.',
-  SURGICAL_EVALUATION: 'KT bajarildi. Neyrojarroh bilan darhol maslahat zarur.',
+  CT_REQUIRED:         'KT bajarildi. Natijaga qarab nevrologik monitoring tavsiya etiladi.',
+  SURGICAL_EVALUATION: 'KT bajarildi. Neyrojarroh bilan maslahat tavsiya etiladi.',
 };
 
 const URGENCY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -359,7 +359,7 @@ export default function ResultPage() {
                   🏥 Jarrohlik holati:{' '}
                   {{
                     observe:          'Kuzatish yetarli',
-                    repeat_ct:        'KT takrorlash zarur',
+                    repeat_ct:        'KT takrorlash tavsiya etiladi',
                     surgery_required: 'Jarrohlik talab etiladi',
                   }[result.hematomaSurgery] ?? result.hematomaSurgery}
                 </div>

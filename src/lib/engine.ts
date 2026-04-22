@@ -367,7 +367,7 @@ export function analyze(
       impact: "6–12 soatdan keyin KT takrorlash tavsiya etiladi; o'lcham oshishi yoki klinik yomonlashish bo'lsa neyrojarroh maslahat tavsiya etiladi",
       source: "BTF 2016, ACS TQIP 2023"
     });
-    // Kombinatsiya: Kontuziya + GCS <= 8 → jarrohlik baholash zarur
+    // Kombinatsiya: Kontuziya + GCS <= 8 → jarrohlik baholash tavsiya etiladi
     if (gcsTotal <= 8) {
       btfScore = Math.max(btfScore, 85);
       hematomaSurgery = 'surgery_required';
