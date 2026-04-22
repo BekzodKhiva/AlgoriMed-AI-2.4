@@ -113,8 +113,8 @@ export default function ResultPage() {
 
   const urgency    = URGENCY_CONFIG[result.urgency] ?? URGENCY_CONFIG.LOW;
   const isEmergency = result.urgency === 'EMERGENCY' || result.urgency === 'HIGH';
-  const ctDone     = result.patientInfo?.ctResult !== undefined
-    ? result.patientInfo.ctResult !== 'not_done' : false;
+  const ctFindings  = result.patientInfo?.ctFindings ?? [];
+  const ctDone      = ctFindings.length > 0 || (result.patientInfo as any)?.ctStatus === 'normal';
   const decisionLabel = ctDone
     ? (DECISION_UZ_CT_DONE[result.decision] ?? DECISION_UZ[result.decision])
     : (DECISION_UZ[result.decision] ?? result.decision);

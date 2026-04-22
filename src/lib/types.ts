@@ -52,7 +52,11 @@ export interface ClinicalInput {
     basalSkullFracture: boolean;
   };
 
-  ctResult: 'not_done' | 'normal' | 'hematoma' | 'contusion' | 'fracture' | 'other';
+  // ── KT NATIJASI (multi-select) ────────────────────────────────────────
+  // ctStatus: KT bajarilganmi va umumiy holat
+  // ctFindings: bir vaqtda bir nechta topilma belgilash mumkin (neyroxirurg tavsiyasi)
+  ctStatus: 'not_done' | 'normal';   // Bajarilmagan yoki normal — hech narsa yo'q
+  ctFindings: Array<'hematoma' | 'contusion' | 'fracture' | 'other'>;  // Anormal topilmalar (multi-select)
   hematomaType?: 'epidural' | 'subdural' | 'intracerebral' | 'subarachnoid';
   hematomaVolume?: number;
   hematomaThickness?: number;
@@ -143,7 +147,7 @@ export interface AnalysisResult {
     age: number;
     sex: string;
     traumaMechanism: string;
-    ctResult?: string;
+    ctFindings?: string[];
   };
 
   analyzedAt?: string;

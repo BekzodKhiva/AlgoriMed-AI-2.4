@@ -71,7 +71,10 @@ export async function generatePDF(result: AnalysisResult, doctorName: string): P
   y += 5;
 
   if (result.patientInfo) {
-    addText(`Bemor: ${result.patientInfo.age} yosh, ${result.patientInfo.sex} | Mexanizm: ${result.patientInfo.traumaMechanism}`, margin, y, { size: 9, color: [80,80,80] });
+    const ctLabel = result.patientInfo.ctFindings && result.patientInfo.ctFindings.length > 0
+      ? result.patientInfo.ctFindings.join(', ')
+      : 'Normal/Bajarilmagan';
+    addText(`Bemor: ${result.patientInfo.age} yosh, ${result.patientInfo.sex} | Mexanizm: ${result.patientInfo.traumaMechanism} | KT: ${ctLabel}`, margin, y, { size: 9, color: [80,80,80] });
     y += 5;
   }
   addLine(y); y += 6;
@@ -106,7 +109,10 @@ export async function generatePDF(result: AnalysisResult, doctorName: string): P
 
   // ── CLINICAL FINDINGS ───────────────────────────────────────────────────
   addText('KLINIK TOPILMALAR', margin, y, { size: 9, bold: true, color: [15,52,96] }); y += 5;
-  addText(`GCS Jami: ${result.gcsTotal} | Og'irlik: ${SEVERITY_LABELS[result.severity] ?? result.severity} | Jarrohlik: ${result.surgicalUrgency}`, margin, y, { size: 9 }); y += 7;
+  const SURGICAL_LABELS: Record<string, string> = {
+    not_required: 'Talab etilmaydi', monitor: 'Kuzatish', urgent: 'Shoshilinch', emergency: 'FAVQULODDA'
+  };
+  addText(`GCS Jami: ${result.gcsTotal} | Og'irlik: ${SEVERITY_LABELS[result.severity] ?? result.severity} | Jarrohlik: ${SURGICAL_LABELS[result.surgicalUrgency] ?? result.surgicalUrgency}`, margin, y, { size: 9 }); y += 7;
   addLine(y); y += 5;
 
   // ── REASONS ─────────────────────────────────────────────────────────────

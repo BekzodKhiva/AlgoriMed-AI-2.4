@@ -111,7 +111,9 @@ export async function POST(req: NextRequest) {
       spo2_foiz:          input.spO2             ?? '',
       nafas_tezligi:      input.respiratoryRate  ?? '',
       rts_ball:           result.rtsScore        ?? '',
-      kt_natijasi:        CT_UZ[input.ctResult]  ?? input.ctResult,
+      kt_natijasi:        (input.ctFindings && input.ctFindings.length > 0)
+                            ? input.ctFindings.map((f: string) => CT_UZ[f] ?? f).join(' + ')
+                            : (input.ctStatus === 'normal' ? 'Normal' : 'Bajarilmagan'),
       hematoma_turi:      hematomaType,
       gematoma_ml:        input.hematomaVolume   ?? '',
       gematoma_qalinligi: input.hematomaThickness ?? '',

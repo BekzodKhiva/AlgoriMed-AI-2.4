@@ -75,7 +75,13 @@ export function analyze(
 
   const gcsTotal     = input.gcs.eye + input.gcs.verbal + input.gcs.motor;
   const comorbidities = input.comorbidities ?? [];
-  const ctDone       = input.ctResult !== 'not_done';
+  // ── CT HOLATI (multi-select logikasi) ──────────────────────────────────
+  const ctFindings   = input.ctFindings ?? [];
+  const hasHematoma  = ctFindings.includes('hematoma');
+  const hasContusion = ctFindings.includes('contusion');
+  const hasFracture  = ctFindings.includes('fracture');
+  const ctDone       = input.ctStatus !== 'not_done' || ctFindings.length > 0;
+  const ctNormal     = input.ctStatus === 'normal' && ctFindings.length === 0;
 
   // Vital signs mavjudligi
   const hasSBP  = input.sbp  !== undefined && input.sbp  > 0;
@@ -297,7 +303,7 @@ export function analyze(
   let   btfScore = 0;
   let   hematomaSurgery: AnalysisResult['hematomaSurgery'] = null;
 
-  if (input.ctResult === 'hematoma' && input.hematomaVolume !== undefined) {
+  if (hasHematoma && input.hematomaVolume !== undefined) {
     const vol       = input.hematomaVolume;
     const shift     = input.midlineShift ?? 0;
     const thickness = input.hematomaThickness ?? 0;
@@ -345,7 +351,7 @@ export function analyze(
   }
 
   // ── KONTUZIYA (BTF 2016) ──────────────────────────────────────────────
-  if (input.ctResult === 'contusion') {
+  if (hasContusion) {
     btfScore = Math.max(btfScore, 50);
     hematomaSurgery = hematomaSurgery ?? 'repeat_ct';
     surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
@@ -384,7 +390,7 @@ export function analyze(
   }
 
   // ── SUYAK SINISHI (BTF 2016) ──────────────────────────────────────────
-  if (input.ctResult === 'fracture') {
+  if (hasFracture) {
     btfScore = Math.max(btfScore, 40);
     surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
     btfRules.push({
@@ -408,6 +414,68 @@ export function analyze(
         weight: 0.65
       });
     }
+  }
+
+  // ── MULTI-SELECT KOMBINATSIYALAR (neyroxirurg tavsiyasi) ────────────────
+  // Bir vaqtda bir nechta KT topilma → yanada og'ir klinik holat
+
+  // Gematoma + Kontuziya → ikkilamchi zararlanish xavfi, KRITIK baholash
+  if (hasHematoma && hasContusion) {
+    btfScore = Math.max(btfScore, 85);
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+    hematomaSurgery = 'surgery_required';
+    btfRules.push({
+      id: 'BTF-MC-HC', name: 'Gematoma + Kontuziya', protocol: 'BTF', riskLevel: 'high',
+      description: "Gematoma + Miya kontuziyasi — ikkilamchi zararlanish xavfi yuqori, neyrojarroh DARHOL (BTF 2016)",
+      weight: 0.85
+    });
+    xaiEntries.push({
+      fact:   "KT: Gematoma VA Kontuziya birgalikda",
+      effect: "Qon yig'ilishi + to'qima zarari → shish va ICP oshishi xavfi kuchayadi",
+      impact: "Neyrojarroh bilan DARHOL maslahat; dinamik KT monitoring zarur",
+      source: "BTF 2016, ACS TQIP 2023"
+    });
+  }
+
+  // Gematoma + Suyak sinishi → epidural gematoma ehtimoli yuqori
+  if (hasHematoma && hasFracture) {
+    btfScore = Math.max(btfScore, 80);
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+    hematomaSurgery = 'surgery_required';
+    btfRules.push({
+      id: 'BTF-MC-HF', name: 'Gematoma + Suyak sinishi', protocol: 'BTF', riskLevel: 'high',
+      description: "Gematoma + Suyak sinishi — epidural gematoma ehtimoli yuqori, BTF bo'yicha jarrohlik baholash (BTF 2016)",
+      weight: 0.80
+    });
+  }
+
+  // Kontuziya + Suyak sinishi → mexanik + to'qima jarohat
+  if (hasContusion && hasFracture) {
+    btfScore = Math.max(btfScore, 65);
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+    btfRules.push({
+      id: 'BTF-MC-CF', name: 'Kontuziya + Suyak sinishi', protocol: 'BTF', riskLevel: 'high',
+      description: "Miya kontuziyasi + Suyak sinishi — kombinatsiyalangan jarohat, neyrojarroh konsultatsiyasi zarur (BTF 2016)",
+      weight: 0.65
+    });
+  }
+
+  // Gematoma + Kontuziya + Suyak sinishi → og'ir politravma TBI, FAVQULODDA
+  if (hasHematoma && hasContusion && hasFracture) {
+    btfScore = 100;
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'emergency');
+    hematomaSurgery = 'surgery_required';
+    btfRules.push({
+      id: 'BTF-MC-ALL', name: 'Uch topilma — FAVQULODDA', protocol: 'BTF', riskLevel: 'high',
+      description: "Gematoma + Kontuziya + Suyak sinishi — og'ir TBI, FAVQULODDA neyrojarrohlik (BTF 2016)",
+      weight: 1.0
+    });
+    xaiEntries.push({
+      fact:   "KT: Gematoma + Kontuziya + Suyak sinishi — uchala topilma birgalikda",
+      effect: "Eng og'ir TBI kombinatsiyasi — qon ketish, to'qima zarari va mexanik buzilish",
+      impact: "FAVQULODDA neyrojarrohlik baholash; hayot uchun xavfli holat",
+      source: "BTF 2016, ENLS 6.0, ACS TQIP 2023"
+    });
   }
 
   // CN IV / VI — ko'z harakat buzilishi → ICP oshishi (K24)
@@ -573,7 +641,7 @@ export function analyze(
 
   // K10: Meningeal belgilar + gematoma (BTF + NICE)
   if ((input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness)
-      && input.ctResult === 'hematoma' && hierarchyOverride === null) {
+      && hasHematoma && hierarchyOverride === null) {
     hierarchyOverride = 'urgent';
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
     overrideReasons.push("Meningeal belgilar + gematoma → neyrojarroh DARHOL (NICE 2023, BTF 2016)");
@@ -593,7 +661,7 @@ export function analyze(
   }
 
   // K36: Koagulopatiya + gematoma (ACS TQIP 2023)
-  if (comorbidities.includes('coagulopathy') && input.ctResult === 'hematoma' && hierarchyOverride !== 'emergency') {
+  if (comorbidities.includes('coagulopathy') && hasHematoma && hierarchyOverride !== 'emergency') {
     hierarchyOverride = 'urgent';
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
     overrideReasons.push("Koagulopatiya + gematoma → reversal terapiya + shoshilinch jarrohlik (ACS TQIP 2023)");
@@ -601,13 +669,13 @@ export function analyze(
 
   // ── DARAJA 3: O'RTA XAVF ─────────────────────────────────────────────
 
-  if (input.anticoagulant && input.ctResult === 'normal' && hierarchyOverride === null) {
+  if (input.anticoagulant && ctNormal && hierarchyOverride === null) {
     overrideReasons.push("Antikoagulyant + CT normal → 24 soat yotqizish MAJBURIY (Cohen 2006)");
   }
-  if (cchrScore >= 30 && input.ctResult === 'normal') {
+  if (cchrScore >= 30 && ctNormal) {
     overrideReasons.push("CCHR yuqori xavf + CT normal → kuzatish zarur (NICE 2023)");
   }
-  if ((input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness) && input.ctResult === 'normal') {
+  if ((input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness) && ctNormal) {
     overrideReasons.push("Meningeal belgilar + CT normal → LP ko'rsatmasi (SAQ istisno qilinsin)");
   }
   if (input.sex === 'female' && input.pregnancy) {
@@ -622,7 +690,7 @@ export function analyze(
   if (input.complaints.seizure && gcsTotal <= 12) {
     overrideReasons.push("Tutqanoq + GCS <= 12 → CT darhol bajarilsin (BTF 2016)");
   }
-  if (gcsTotal <= 8 && input.ctResult === 'normal') {
+  if (gcsTotal <= 8 && ctNormal) {
     overrideReasons.push("GCS <= 8 + CT normal → Diffuz Aksonal Jarohat (DAJ) ehtimoli, MRI ko'rsatmasi");
   }
 
@@ -834,19 +902,19 @@ export function analyze(
     treatmentTactics.push("Alkogol: hushyor bo'lganda GCS qayta baholansin; 4–6 soat ichida klinik qayta ko'rish tavsiya etiladi (NICE 2023)");
   if (input.sex === 'female' && input.pregnancy)
     treatmentTactics.push("Homilador: akusher-ginekolog bilan koordinatsiya; KT bajarilsa qorin sohasini qo'rg'oshin ekran bilan himoya qilish tavsiya etiladi");
-  if (input.anticoagulant && input.ctResult === 'normal')
+  if (input.anticoagulant && ctNormal)
     treatmentTactics.push("Antikoagulyant + CT normal: 24 soat yotqizish ko'rib chiqilsin — kechikkan qon ketish xavfi (Cohen 2006)");
-  if (input.anticoagulant && input.ctResult === 'hematoma')
+  if (input.anticoagulant && hasHematoma)
     treatmentTactics.push("Antikoagulyant + gematoma: reversal terapiya ko'rib chiqilsin (warfarin → 4F-PCC; DOAC → idarucizumab/andexanet)");
-  if (input.anticoagulant && input.ctResult === 'contusion')
+  if (input.anticoagulant && hasContusion)
     treatmentTactics.push("Antikoagulyant + kontuziya: reversal terapiyani ko'rib chiqing — kechikkan qon ketish xavfi (BTF 2016, Cohen 2006)");
-  if (input.ctResult === 'contusion')
+  if (hasContusion)
     treatmentTactics.push("Miya kontuziyasi: 6–12 soatdan keyin KT takrorlashni ko'rib chiqing — o'lcham oshishi kuzatilsin (BTF 2016)");
-  if (input.ctResult === 'fracture')
+  if (hasFracture)
     treatmentTactics.push("Bosh suyagi sinishi: neyrojarroh konsultatsiyasini ko'rib chiqing; agar asos suyagi belgilari bo'lsa — DARHOL (BTF 2016)");
-  if (gcsTotal <= 8 && input.ctResult === 'normal')
+  if (gcsTotal <= 8 && ctNormal)
     treatmentTactics.push("GCS <= 8 + CT normal: Diffuz Aksonal Jarohat (DAJ) ehtimoli — MRI buyurishni ko'rib chiqing (ACS TQIP 2023)");
-  if ((input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness) && input.ctResult === 'normal')
+  if ((input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness) && ctNormal)
     treatmentTactics.push("Meningeal belgilar + CT normal: LP (lyumbar punksiya) ko'rsatmasini ko'rib chiqing — SAQ istisno qilinsin");
   if (comorbidities.includes('coagulopathy'))
     treatmentTactics.push("Koagulopatiya: INR tekshiruvi va reversal terapiya (4F-PCC) ko'rsatmasini baholang (ACS TQIP 2023)");
@@ -932,7 +1000,7 @@ export function analyze(
       age:             input.age,
       sex:             input.sex === 'male' ? 'Erkak' : 'Ayol',
       traumaMechanism: mechanismLabels[input.traumaMechanism] ?? input.traumaMechanism,
-      ctResult:        input.ctResult,
+      ctFindings:      input.ctFindings ?? [],
     },
     analyzedAt: new Date().toISOString(),
   };

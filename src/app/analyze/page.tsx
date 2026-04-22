@@ -18,7 +18,8 @@ const defaultInput = (): ClinicalInput => ({
   cranialNerves: { cn3: 'N', cn4: 'N', cn5: 'N', cn6: 'N', cn7: 'N', cn8: 'N', cn9: 'N', cn10: 'N', cn11: 'N', cn12: 'N', cn1: 'N', cn2: 'N' },
   meningealSigns: { neckStiffness: false, kernig: false, brudzinski: false },
   cchrAdditional: { gcsLessThan15at2hrs: false, suspectedOpenFracture: false, basalSkullFracture: false },
-  ctResult: 'not_done',
+  ctStatus: 'not_done' as 'not_done' | 'normal',
+  ctFindings: [] as Array<'hematoma' | 'contusion' | 'fracture' | 'other'>,
   hematomaType: undefined, hematomaVolume: undefined, hematomaThickness: undefined, midlineShift: undefined,
   diabetes: false, hypertensionHistory: false,
   comorbidities: [],
@@ -660,24 +661,63 @@ export default function AnalyzePage() {
 
               <div className={styles.card}>
                 <h3 className={styles.cardTitle}>KT natijasi</h3>
-                <div className={styles.ctGrid}>
+                <p className={styles.cardDesc}>Bir vaqtda bir nechta topilmani belgilash mumkin</p>
+
+                {/* 1-qator: Bajarilmagan / Normal — toggle */}
+                <div className={styles.ctGrid} style={{ marginBottom: 10 }}>
                   {([
-                    ['not_done',  '🔲', 'Bajarilmagan'],
-                    ['normal',    '✅', 'Normal'],
-                    ['hematoma',  '🩸', 'Gematoma'],
-                    ['contusion', '🟠', 'Kontuziya'],
-                    ['fracture',  '💀', 'Suyak sinishi'],
-                    ['other',     '⚠️', 'Boshqa'],
+                    ['not_done', '🔲', 'Bajarilmagan'],
+                    ['normal',   '✅', 'Normal (patologiya yo\'q)'],
                   ] as const).map(([val, icon, name]) => (
                     <button key={val} type="button"
-                      className={`${styles.ctBtn} ${form.ctResult === val ? styles.ctBtnActive : ''}`}
-                      onClick={() => set('ctResult', val)}>
+                      className={`${styles.ctBtn} ${form.ctStatus === val && form.ctFindings.length === 0 ? styles.ctBtnActive : ''}`}
+                      onClick={() => {
+                        set('ctStatus', val);
+                        set('ctFindings', []);
+                        if (val === 'not_done' || val === 'normal') {
+                          set('hematomaType', undefined);
+                          set('hematomaVolume', undefined);
+                          set('hematomaThickness', undefined);
+                          set('midlineShift', undefined);
+                        }
+                      }}>
                       <span>{icon}</span><span>{name}</span>
                     </button>
                   ))}
                 </div>
 
-                {form.ctResult === 'hematoma' && (
+                {/* 2-qator: Anormal topilmalar — multi-select checkbox */}
+                <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--muted)' }}>
+                  Anormal topilmalar (bir nechta belgilash mumkin):
+                </div>
+                <div className={styles.ctGrid}>
+                  {([
+                    ['hematoma',  '🩸', 'Gematoma'],
+                    ['contusion', '🟠', 'Kontuziya'],
+                    ['fracture',  '💀', 'Suyak sinishi'],
+                    ['other',     '⚠️', 'Boshqa'],
+                  ] as const).map(([val, icon, name]) => {
+                    const isActive = form.ctFindings.includes(val);
+                    return (
+                      <button key={val} type="button"
+                        className={`${styles.ctBtn} ${isActive ? styles.ctBtnActive : ''}`}
+                        onClick={() => {
+                          const current = form.ctFindings as Array<'hematoma' | 'contusion' | 'fracture' | 'other'>;
+                          if (isActive) {
+                            set('ctFindings', current.filter(f => f !== val));
+                          } else {
+                            set('ctFindings', [...current, val]);
+                            set('ctStatus', 'normal'); // topilma bor = KT bajarilgan
+                          }
+                        }}>
+                        <span>{icon}</span><span>{name}</span>
+                        {isActive && <span style={{ fontSize: 10, marginLeft: 4 }}>✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {form.ctFindings.includes('hematoma') && (
                   <div className={styles.hematomaFields}>
                     <div className={styles.cardTitle} style={{ marginBottom: 14 }}>Gematoma tafsilotlari (BTF protokoli)</div>
                     <div className={styles.row2}>
@@ -793,7 +833,18 @@ export default function AnalyzePage() {
                   <div className={styles.reviewRow}><span>Nistagm</span><strong>{form.complaints.nystagmus ? 'Ha ⚠️' : "Yo'q"}</strong></div>
                   <div className={styles.reviewRow}><span>Tutqanoq</span><strong>{form.complaints.seizure ? 'Ha ⚠️' : "Yo'q"}</strong></div>
                   <div className={styles.reviewRow}><span>Qusish</span><strong>{form.complaints.vomiting === 'none' ? "Yo'q" : form.complaints.vomiting === 'once' ? '1 marta' : 'Qayta-qayta ⚠️'}</strong></div>
-                  <div className={styles.reviewRow}><span>KT natijasi</span><strong>{form.ctResult}</strong></div>
+                  <div className={styles.reviewRow}>
+                    <span>KT natijasi</span>
+                    <strong>
+                      {form.ctFindings.length > 0
+                        ? form.ctFindings.map(f =>
+                            f === 'hematoma'  ? '🩸 Gematoma'    :
+                            f === 'contusion' ? '🟠 Kontuziya'   :
+                            f === 'fracture'  ? '💀 Suyak sinishi' : '⚠️ Boshqa'
+                          ).join(', ')
+                        : form.ctStatus === 'normal' ? '✅ Normal' : '🔲 Bajarilmagan'}
+                    </strong>
+                  </div>
                 </div>
 
                 <div className={styles.reviewCard}>
