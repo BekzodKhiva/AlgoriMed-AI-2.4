@@ -169,7 +169,7 @@ export function analyze(
       xaiEntries.push({
         fact:   `SBP = ${sbp} mmHg (xavf zonasi: 90–110)`,
         effect: 'Nisbiy gipotenziya → serebral avtoregulyatsiya chegarasida → CPP pasayishi xavfi',
-        impact: 'Secondary brain injury xavfi oshadi. Maqsad SBP >= 110 mmHg (ACS TBI 2024). Monitoring zarur',
+        impact: 'Secondary brain injury ehtimoli oshadi. Maqsad SBP >= 110 mmHg (ACS TBI 2024). Monitoring tavsiya etiladi',
         source: 'ACS TBI 2024, BTF 2023, IMPACT model'
       });
     }
@@ -237,7 +237,7 @@ export function analyze(
     xaiEntries.push({
       fact:   `Qorin og'rig'i + SBP = ${sbp} mmHg`,
       effect: 'Qorin jarohati (jigar/taloq?) → gipotenziya → TBI ikkilamchi zararlanishi',
-      impact: 'FAST tekshiruvi DARHOL. Umumiy jarroh + neyrojarroh birgalikda zarur',
+      impact: 'FAST tekshiruvi tavsiya etiladi. Umumiy jarroh + neyrojarroh birgalikda maslahat tavsiya etiladi',
       source: 'WSES 2020, CRASH model, ACS TQIP 2023'
     });
   }
@@ -332,7 +332,7 @@ export function analyze(
       if (gcsTotal >= 9) {
         btfScore = 75; surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
         btfRules.push({ id: 'BTF-H3', name: 'BTF Jarrohlik', protocol: 'BTF', riskLevel: 'high',
-          description: `Gematoma ${vol}ml — neyrojarroh bilan maslahat zarur`, weight: 0.75 });
+          description: `Gematoma ${vol}ml — neyrojarroh maslahat tavsiya etiladi`, weight: 0.75 });
       } else {
         btfScore = 90; surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
         btfRules.push({ id: 'BTF-H3b', name: 'BTF Jarrohlik+GCS', protocol: 'BTF', riskLevel: 'high',
@@ -363,7 +363,7 @@ export function analyze(
     xaiEntries.push({
       fact:   "KT natijasi: Miya kontuziyasi",
       effect: "Birlamchi miya to'qimasi zararlangan — ikkilamchi shish va qon ketish xavfi mavjud",
-      impact: "6–12 soatdan keyin KT takrorlash zarur; o'lcham oshishi jarrohlik ko'rsatmasi bo'lishi mumkin",
+      impact: "6–12 soatdan keyin KT takrorlash tavsiya etiladi; o'lcham oshishi yoki klinik yomonlashish bo'lsa neyrojarroh maslahat tavsiya etiladi",
       source: "BTF 2016, ACS TQIP 2023"
     });
     // Kombinatsiya: Kontuziya + GCS <= 8 → jarrohlik baholash zarur
@@ -373,7 +373,7 @@ export function analyze(
       surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
       btfRules.push({
         id: 'BTF-CONT-GCS', name: 'Kontuziya + GCS ≤ 8', protocol: 'BTF', riskLevel: 'high',
-        description: `Miya kontuziyasi + GCS ${gcsTotal} ≤ 8 — neyrojarrohlik baholash zarur (BTF 2016)`,
+        description: `Miya kontuziyasi + GCS ${gcsTotal} ≤ 8 — neyrojarroh maslahat tavsiya etiladi (BTF 2016)`,
         weight: 0.85
       });
     }
@@ -383,7 +383,7 @@ export function analyze(
       surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
       btfRules.push({
         id: 'BTF-CONT-AC', name: 'Kontuziya + Antikoagulyant', protocol: 'BTF', riskLevel: 'high',
-        description: "Miya kontuziyasi + antikoagulyant — kechikkan qon ketish xavfi yuqori, reversal ko'rib chiqilsin (BTF 2016)",
+        description: "Miya kontuziyasi + antikoagulyant — kechikkan qon ketish ehtimoli yuqori, reversal terapiya ko'rib chiqilishi tavsiya etiladi (BTF 2016)",
         weight: 0.70
       });
     }
@@ -401,7 +401,7 @@ export function analyze(
     xaiEntries.push({
       fact:   "KT natijasi: Bosh suyagi sinishi",
       effect: "Mexanik buzilish — ostidagi miya to'qimasi va qon tomirlari zararlangan bo'lishi mumkin",
-      impact: "Neyrojarroh konsultatsiyasi zarur; asos suyagi sinishi belgilari bo'lsa — DARHOL baholash",
+      impact: "Neyrojarroh maslahat tavsiya etiladi; asos suyagi sinishi belgilari bo'lsa — tezkor baholash tavsiya etiladi",
       source: "BTF 2016, CCHR Lancet 2001"
     });
     // Kombinatsiya: Suyak sinishi + asos suyagi belgilari (basalSkullFracture)
@@ -410,7 +410,7 @@ export function analyze(
       surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
       btfRules.push({
         id: 'BTF-FRAC-BASE', name: 'Asos suyagi sinishi', protocol: 'BTF', riskLevel: 'high',
-        description: "Asos suyagi sinishi (Battle belgisi / Raccoon eyes / CSF oqishi) — neyrojarroh DARHOL (BTF 2016)",
+        description: "Asos suyagi sinishi (Battle belgisi / Raccoon eyes / CSF oqishi) — neyrojarroh maslahat tavsiya etiladi (BTF 2016)",
         weight: 0.65
       });
     }
@@ -426,13 +426,13 @@ export function analyze(
     hematomaSurgery = 'surgery_required';
     btfRules.push({
       id: 'BTF-MC-HC', name: 'Gematoma + Kontuziya', protocol: 'BTF', riskLevel: 'high',
-      description: "Gematoma + Miya kontuziyasi — ikkilamchi zararlanish xavfi yuqori, neyrojarroh DARHOL (BTF 2016)",
+      description: "Gematoma + Miya kontuziyasi — ikkilamchi zararlanish ehtimoli yuqori, neyrojarroh maslahat tavsiya etiladi (BTF 2016)",
       weight: 0.85
     });
     xaiEntries.push({
       fact:   "KT: Gematoma VA Kontuziya birgalikda",
       effect: "Qon yig'ilishi + to'qima zarari → shish va ICP oshishi xavfi kuchayadi",
-      impact: "Neyrojarroh bilan DARHOL maslahat; dinamik KT monitoring zarur",
+      impact: "Neyrojarroh maslahat tavsiya etiladi; dinamik KT monitoring tavsiya etiladi",
       source: "BTF 2016, ACS TQIP 2023"
     });
   }
@@ -455,7 +455,7 @@ export function analyze(
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
     btfRules.push({
       id: 'BTF-MC-CF', name: 'Kontuziya + Suyak sinishi', protocol: 'BTF', riskLevel: 'high',
-      description: "Miya kontuziyasi + Suyak sinishi — kombinatsiyalangan jarohat, neyrojarroh konsultatsiyasi zarur (BTF 2016)",
+      description: "Miya kontuziyasi + Suyak sinishi — kombinatsiyalangan jarohat, neyrojarroh maslahat tavsiya etiladi"rojarroh konsultatsiyasi zarur (BTF 2016)",
       weight: 0.65
     });
   }
@@ -538,11 +538,11 @@ export function analyze(
   }
   if (input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness) {
     niceScore += 30;
-    niceRules.push({ id: 'NICE-2', name: 'NICE Meningeal', protocol: 'NICE', riskLevel: 'high', description: "Meningeal belgilar — meningit / SAQ istisno qilinsin (NICE CG176)", weight: 0.30 });
+    niceRules.push({ id: 'NICE-2', name: 'NICE Meningeal', protocol: 'NICE', riskLevel: 'high', description: "Meningeal belgilar — meningit / SAQ ehtimolini istisno qilish tavsiya etiladi (NICE CG176)", weight: 0.30 });
   }
   if (input.sex === 'female' && input.pregnancy) {
     niceScore += 20;
-    niceRules.push({ id: 'NICE-P1', name: 'NICE Homiladorlik', protocol: 'NICE', riskLevel: 'high', description: "Homilador bemor: KT — qorin himoyasi zarur; MRI afzal (NICE CG176)", weight: 0.20 });
+    niceRules.push({ id: 'NICE-P1', name: 'NICE Homiladorlik', protocol: 'NICE', riskLevel: 'high', description: "Homilador bemor: KT bajarilsa qorin himoyasi tavsiya etiladi; MRI afzal (NICE CG176)", weight: 0.20 });
   }
   if (input.complaints.vomiting === 'once') {
     niceScore += 10;
@@ -562,7 +562,7 @@ export function analyze(
   if (input.alcoholIntoxication) {
     alcoholScore = 70;
     alcoholRules.push({ id: 'ALC-1', name: 'Alkogol intoksikatsiyasi', protocol: 'CCHR', riskLevel: 'medium',
-      description: "Alkogol: GCS ishonchsiz → CT majburiy; hushyor bo'lganda GCS qayta baholansin (Sperry 2006)", weight: 0.70 });
+      description: "Alkogol: GCS ishonchsiz bo'lishi mumkin → CT tavsiya etiladi; hushyor bo'lganda GCS qayta baholansin (Sperry 2006)", weight: 0.70 });
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -581,12 +581,12 @@ export function analyze(
     btfScore = 100;
     surgicalUrgency = worstSurgical(surgicalUrgency, 'emergency');
     btfRules.push({ id: 'BTF-N1', name: 'Anizokoria — FAVQULODDA', protocol: 'BTF', riskLevel: 'high',
-      description: "Ko'z qorachig'i asimmetriyasi — transtentorial herniatsiya ehtimoli. FAVQULODDA neyrojarrohlik baholash + shoshilinch KT zarur (BTF 2016)", weight: 1.0 });
+      description: "Ko'z qorachig'i asimmetriyasi — transtentorial herniatsiya ehtimoli. Neyrojarrohlik baholash va shoshilinch KT tavsiya etiladi (BTF 2016)", weight: 1.0 });
     overrideReasons.push("Anizokoria — transtentorial herniatsiya belgisi");
     xaiEntries.push({
       fact:   `Anizokoria: ${input.anisocoria} tomonda kengaygan qorachiq`,
       effect: "CN III siqilishi → transtentorial herniatsiya ehtimoli — miya o'qi pastga siljiydi",
-      impact: 'FAVQULODDA neyrojarrohlik BAHOLASH zarur. Shoshilinch KT (agar bajarilmagan bo\'lsa) — KT natijasiga qarab jarrohlik qaror qilinadi (BTF 2016)',
+      impact: 'Neyrojarrohlik baholash tavsiya etiladi. Shoshilinch KT (agar bajarilmagan bo\'lsa) — KT natijasiga qarab jarrohlik masalasi ko\'rib chiqiladi (BTF 2016)',
       source: 'BTF 2016, EMCrit, ENLS 6.0'
     });
   }
@@ -1053,16 +1053,6 @@ export function analyze(
       effect: "Keksa yoshda serebral atrofiya → subdural gematoma uchun kengroq bo'shliq, kech klinik ko'rinish; antikoagulyant ehtimoli yuqori",
       impact: "CCHR: yosh ≥65 = yuqori xavf mezoni. NICE CG176: 65+ + antikoagulyant = KT tavsiya etiladi. BTF: yosh ≥60 jarrohlik xavfini oshiradi",
       source: 'Stiell IG Lancet 2001. NICE CG176 2023. BTF 4th Ed. 2016'
-    });
-  }
-
-  // Kontuziya (XAI)
-  if (hasContusion) {
-    xaiEntries.push({
-      fact:   'KT da miya kontuziyasi aniqlandi',
-      effect: "Kontuziya — miya to'qimasining shikastlanishi, kechikkan gematoma rivojlanish ehtimoli bor",
-      impact: "BTF 2016: kontuziya = dinamik kuzatish va 6–12 soatdan keyin KT takrorlash tavsiya etiladi. Antikoagulyant bor bo'lsa xavf yanada oshadi",
-      source: 'BTF 4th Ed. 2016, Carney N et al. Neurosurgery 2017'
     });
   }
 
