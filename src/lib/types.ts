@@ -27,7 +27,7 @@ export interface ClinicalInput {
     seizure: boolean;
     weakness: boolean;
     nystagmus: boolean;
-    // Politravma shikoyatlari (WSES 2019/2020, CRASH model)
+    // Qo'shimcha jarohatlar shikoyatlari (WSES 2019/2020, CRASH model)
     chestPain: boolean;      // Ko'krak og'rig'i / nafas qiyinligi
     abdominalPain: boolean;  // Qorin og'rig'i / sezgirligi
     limbPain: boolean;       // Qo'l/oyoq og'rig'i / deformatsiyasi
@@ -141,6 +141,7 @@ export interface AnalysisResult {
   hematomaSurgery: null | 'observe' | 'repeat_ct' | 'surgery_required';
 
   pubmedQuery: string;
+  pubmedQueries: string[];
   disclaimer: string;
 
   patientInfo?: {

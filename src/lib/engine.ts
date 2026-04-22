@@ -22,7 +22,7 @@ import {
 } from './types';
 
 // ── PROTOKOL VAZNLARI (ilmiy asoslangan) ─────────────────────────────────
-// Bu vaznlar faqat TBI protokollari uchun — vital signs va politravma
+// Bu vaznlar faqat TBI protokollari uchun — vital signs va qo'shimcha jarohatlar
 // alohida ierarxik override tizimida ishlaydi (weighted sum emas)
 const WEIGHTS = {
   cchr:    0.35,  // Lancet 2001 — sensitivlik 100%, spetsifiklik 76%
@@ -91,7 +91,7 @@ export function analyze(
   const spO2    = input.spO2 ?? 100;
   const rr      = input.respiratoryRate ?? 0;
 
-  // Politravma sohalari
+  // Qo'shimcha jarohat sohalari
   const polytravmaZones: string[] = [];
   if (input.complaints?.chestPain)     polytravmaZones.push("Ko'krak");
   if (input.complaints?.abdominalPain) polytravmaZones.push("Qorin");
@@ -265,7 +265,7 @@ export function analyze(
     if (rtsScore < 5) {
       xaiEntries.push({
         fact:   `RTS = ${rtsScore} (norma: 7.84)`,
-        effect: "Past RTS → og'ir politravma belgisi",
+        effect: "Past RTS → og'ir qo'shimcha jarohat belgisi",
         impact: 'Travma markazi aktivatsiyasi ko\'rsatmasi (Boyd 1987)',
         source: 'RTS Boyd 1987, TRISS'
       });
@@ -460,7 +460,7 @@ export function analyze(
     });
   }
 
-  // Gematoma + Kontuziya + Suyak sinishi → og'ir politravma TBI, FAVQULODDA
+  // Gematoma + Kontuziya + Suyak sinishi → og'ir kombinatsiyali TBI, FAVQULODDA
   if (hasHematoma && hasContusion && hasFracture) {
     btfScore = 100;
     surgicalUrgency = worstSurgical(surgicalUrgency, 'emergency');
@@ -936,18 +936,173 @@ export function analyze(
     treatmentTactics.push("Immunosupressiya: infeksiya xavfi yuqori — isitma bo'lsa LP ko'rsatmasini ko'rib chiqing");
 
   // ════════════════════════════════════════════════════════════════════
-  // PUBMED — YANGILANGAN KEYWORDS (politravma qo'shildi)
+  // XAI KENGAYTIRISH — GCS, CCHR, BTF, NICE, Alkogol, Yosh
+  // Vital signs XAI yuqorida qatlam 1 da allaqachon qo'shilgan
   // ════════════════════════════════════════════════════════════════════
-  const pubmedTerms = ['"Brain Injuries, Traumatic"[MeSH Terms]'];
-  if (severity === 'mild')                              pubmedTerms.push('"mild traumatic brain injury"[Title/Abstract]');
-  if (severity === 'severe' || severity === 'critical') pubmedTerms.push('"severe traumatic brain injury"[Title/Abstract]');
-  if (input.alcoholIntoxication)                        pubmedTerms.push('"alcohol intoxication traumatic brain injury"[Title/Abstract]');
-  if (input.anticoagulant)                              pubmedTerms.push('"anticoagulant traumatic brain injury"[Title/Abstract]');
-  if (input.sex === 'female' && input.pregnancy)        pubmedTerms.push('"traumatic brain injury pregnancy"[Title/Abstract]');
-  // Yangi — politravma keywords (ilmiy tadqiqot tavsiyasi)
-  if (hasPolytrauma)                                    pubmedTerms.push('"polytrauma" AND "traumatic brain injury"[Title/Abstract]');
-  if (hasSBP && sbp < 90)                              pubmedTerms.push('"hypotension traumatic brain injury secondary insults"[Title/Abstract]');
-  if (hasSpO2 && spO2 < 90)                            pubmedTerms.push('"hypoxia traumatic brain injury outcome"[Title/Abstract]');
+
+  // GCS
+  if (gcsTotal <= 5) {
+    xaiEntries.push({
+      fact:   `GCS jami: ${gcsTotal} (E${input.gcs.eye}+V${input.gcs.verbal}+M${input.gcs.motor})`,
+      effect: "Kritik darajadagi ong buzilishi — beyin o'zagi funksiyasi xavf ostida",
+      impact: "GCS ≤5 = kritik holat. BTF 2016: GCS ≤8 neyrojarroh maslahat ko'rsatmasi. Tezkor baholash tavsiya etiladi",
+      source: 'Teasdale & Jennett 1974, BTF 4th Ed. 2016'
+    });
+  } else if (gcsTotal <= 8) {
+    xaiEntries.push({
+      fact:   `GCS jami: ${gcsTotal} (E${input.gcs.eye}+V${input.gcs.verbal}+M${input.gcs.motor})`,
+      effect: "Og'ir TBI — himoya reflekslari buzilishi, aspiratsiya va ikkilamchi miya jarohati ehtimoli oshadi",
+      impact: "BTF 2016: GCS ≤8 = intubatsiya chegarasi. Shoshilinch KT va neyrojarroh maslahat tavsiya etiladi. IMPACT model: OR o'lim 3.2x",
+      source: 'BTF 4th Ed. 2016, IMPACT model, ACS TQIP 2023'
+    });
+  } else if (gcsTotal <= 12) {
+    xaiEntries.push({
+      fact:   `GCS jami: ${gcsTotal} (E${input.gcs.eye}+V${input.gcs.verbal}+M${input.gcs.motor})`,
+      effect: "O'rta og'irlikdagi TBI — nevrologik yomonlashish ehtimoli mavjud",
+      impact: "NICE CG176: GCS <13 = KT ko'rsatmasi. Dinamik kuzatish va neyrojarroh maslahat tavsiya etiladi",
+      source: 'NICE CG176 2023, BTF 2016, CCHR Lancet 2001'
+    });
+  } else if (gcsTotal <= 14) {
+    xaiEntries.push({
+      fact:   `GCS jami: ${gcsTotal} (E${input.gcs.eye}+V${input.gcs.verbal}+M${input.gcs.motor})`,
+      effect: 'Yengil TBI — GCS 13–14 CCHR yuqori xavf zonasida',
+      impact: "CCHR (Stiell 2001): GCS <15 jarohatdan 2 soat o'tgach = yuqori xavf mezoni. Kuzatish tavsiya etiladi",
+      source: 'CCHR Lancet 2001, NICE CG176 2023'
+    });
+  }
+
+  // CCHR
+  if (cchrScore >= 35) {
+    const activeHighRisk = [
+      input.cchrAdditional.gcsLessThan15at2hrs  && "GCS < 15 (2 soatdan keyin)",
+      input.cchrAdditional.suspectedOpenFracture && "Ochiq/botiq suyak sinishi",
+      input.cchrAdditional.basalSkullFracture    && "Asos suyagi sinishi (Battle, Raccoon eyes)",
+      input.complaints.vomiting === 'repeated'   && "Qayta qusish",
+      input.age >= 65                            && "Yosh ≥65",
+    ].filter(Boolean).join('; ');
+    xaiEntries.push({
+      fact:   `CCHR yuqori xavf: ${activeHighRisk}`,
+      effect: 'Yuqori xavf mezonlari intrakranial jarohat ehtimolini sezilarli oshiradi',
+      impact: "CCHR sezgirligi 99–100% (Stiell 2001, n=3121). Yuqori xavf + KT yo'q = patologiya o'tkazib yuborilish ehtimoli oshadi",
+      source: 'Stiell IG et al. Lancet 2001;357:1391. PMID: 11356436'
+    });
+  } else if (cchrScore >= 15) {
+    xaiEntries.push({
+      fact:   `CCHR o'rta xavf: ${cchrScore}/100`,
+      effect: "Bir yoki bir necha CCHR o'rta xavf omillari aniqlandi",
+      impact: "CCHR: o'rta xavf = KT tavsiya etiladi, ayniqsa yosh ≥65 yoki antikoagulyant bo'lsa",
+      source: 'CCHR Lancet 2001, Foks et al. BMJ 2018'
+    });
+  }
+
+  // BTF — gematoma
+  if (hasHematoma && input.hematomaVolume !== undefined && input.hematomaVolume > 0) {
+    const vol   = input.hematomaVolume;
+    const shift = input.midlineShift ?? 0;
+    xaiEntries.push({
+      fact:   `Gematoma: ${vol}ml${shift > 0 ? `, siljish ${shift}mm` : ''}${input.hematomaType ? ` (${input.hematomaType})` : ''}`,
+      effect: input.hematomaType === 'subdural'
+        ? "Subdural gematoma — venoz qon ketishi, kech ko'rinish, keksa bemorlarda xavf yuqori"
+        : input.hematomaType === 'epidural'
+        ? "Epidural gematoma — arterial qon ketishi, tez kengayish, 'yorug' interval' ehtimoli"
+        : "Intrakranial qon to'planishi — ICP oshishi va miya to'qimasini siqish ehtimoli",
+      impact: `BTF 2016: subdural >10mm yoki siljish >5mm; epidural qalinlik ≥15mm yoki siljish >5mm — jarrohlik mezonlari. Hozir: ${vol >= 30 || shift > 5 ? "jarrohlik ko'rsatmasi ehtimoli yuqori" : vol >= 10 ? "kuzatish + takror KT tavsiya etiladi" : "konservativ boshqaruv tavsiya etiladi"}`,
+      source: 'Bullock MR et al. Neurosurgery 2006. BTF 4th Ed. 2016'
+    });
+  }
+
+  // Antikoagulyant
+  if (input.anticoagulant) {
+    xaiEntries.push({
+      fact:   'Antikoagulyant terapiya mavjud',
+      effect: "Antikoagulyant → qon ivish tizimi buzilishi → minor travmada ham intrakranial qon ketish ehtimoli oshadi",
+      impact: "Cohen 2006 (n=20): dastlab normal KT bo'lgan bemorlarning 90% qayta qabul, jiddiy qon ketish rivojlangan. EFNS: antikoagulyant = mustaqil KT ko'rsatmasi, GCS dan qat'iy nazar. KT normal bo'lsa ham 24 soat yotqizish tavsiya etiladi",
+      source: 'Cohen DB et al. J Trauma 2006. Kavalci C et al. Front Med 2024 PMC11063395'
+    });
+  }
+
+  // Meningeal belgilar
+  if (input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness) {
+    const mSigns = [
+      input.meningealSigns.neckStiffness && "bo'yin qattiqligi",
+      input.meningealSigns.kernig        && 'Kernig belgisi',
+      input.meningealSigns.brudzinski    && 'Brudzinskiy belgisi',
+    ].filter(Boolean).join(', ');
+    xaiEntries.push({
+      fact:   `Meningeal belgilar: ${mSigns}`,
+      effect: "Meningeal irritatsiya — subaraxnoid qon ketish (SAQ) yoki meningit ehtimolini ko'rsatadi",
+      impact: "NICE CG176: meningeal belgilar = KT va LP ko'rsatmasi. LP faqat KT dan keyin — intrakranial bosimni avval istisno qilish tavsiya etiladi",
+      source: 'NICE CG176 2023 Rec. 1.4.10'
+    });
+  }
+
+  // Alkogol
+  if (input.alcoholIntoxication) {
+    xaiEntries.push({
+      fact:   'Alkogol intoksikatsiyasi mavjud',
+      effect: "Alkogol GCS ni sun'iy ravishda pasaytirishi mumkin → haqiqiy nevrologik holat noaniq bo'ladi",
+      impact: "Sperry 2006 (n=55,732): alkogol GCS ni o'rtacha 0.8 ball pasaytiradi. NICE 2023: alkogol metabolizmlanguncha (4–6 soat) qayta baholash tavsiya etiladi",
+      source: 'Sperry JL et al. J Trauma 2006 PMID:17014346. NICE CG176 2023'
+    });
+  }
+
+  // Yosh ≥65
+  if (input.age >= 65) {
+    xaiEntries.push({
+      fact:   `Bemor yoshi: ${input.age}`,
+      effect: "Keksa yoshda serebral atrofiya → subdural gematoma uchun kengroq bo'shliq, kech klinik ko'rinish; antikoagulyant ehtimoli yuqori",
+      impact: "CCHR: yosh ≥65 = yuqori xavf mezoni. NICE CG176: 65+ + antikoagulyant = KT tavsiya etiladi. BTF: yosh ≥60 jarrohlik xavfini oshiradi",
+      source: 'Stiell IG Lancet 2001. NICE CG176 2023. BTF 4th Ed. 2016'
+    });
+  }
+
+  // Kontuziya (XAI)
+  if (hasContusion) {
+    xaiEntries.push({
+      fact:   'KT da miya kontuziyasi aniqlandi',
+      effect: "Kontuziya — miya to'qimasining shikastlanishi, kechikkan gematoma rivojlanish ehtimoli bor",
+      impact: "BTF 2016: kontuziya = dinamik kuzatish va 6–12 soatdan keyin KT takrorlash tavsiya etiladi. Antikoagulyant bor bo'lsa xavf yanada oshadi",
+      source: 'BTF 4th Ed. 2016, Carney N et al. Neurosurgery 2017'
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // PUBMED — AQLLI SO'ROV TIZIMI v2
+  // Har bir klinik holat uchun alohida, sodda va samarali query
+  // MeSH / [Title/Abstract] filtrsiz — kengroq natija
+  // ════════════════════════════════════════════════════════════════════
+  const pubmedQueries: string[] = [];
+
+  if (severity === 'critical' || severity === 'severe') {
+    pubmedQueries.push('severe traumatic brain injury management guidelines');
+  } else if (severity === 'moderate') {
+    pubmedQueries.push('moderate traumatic brain injury CT management');
+  } else {
+    pubmedQueries.push('mild traumatic brain injury CT decision Canadian rule');
+  }
+
+  if (hasHematoma) {
+    if (input.hematomaType === 'subdural')         pubmedQueries.push('acute subdural hematoma surgery criteria outcomes');
+    else if (input.hematomaType === 'epidural')    pubmedQueries.push('epidural hematoma surgical treatment outcomes');
+    else if (input.hematomaType === 'subarachnoid') pubmedQueries.push('traumatic subarachnoid hemorrhage management prognosis');
+    else                                           pubmedQueries.push('intracranial hematoma traumatic brain injury surgery');
+  }
+  if (hasContusion)                               pubmedQueries.push('cerebral contusion traumatic brain injury management progression');
+  if (hasFracture)                                pubmedQueries.push('skull fracture traumatic brain injury management');
+  if (input.anticoagulant)                        pubmedQueries.push('anticoagulant therapy traumatic brain injury hemorrhage reversal');
+  if (input.alcoholIntoxication)                  pubmedQueries.push('alcohol intoxication traumatic brain injury GCS reliability');
+  if (input.anisocoria !== 'none')                pubmedQueries.push('anisocoria transtentorial herniation traumatic brain injury');
+  if (input.age >= 65)                            pubmedQueries.push('elderly traumatic brain injury outcomes management');
+  if (hasSBP && sbp < 90)                         pubmedQueries.push('hypotension traumatic brain injury secondary insult outcome');
+  if (hasSpO2 && spO2 < 90)                       pubmedQueries.push('hypoxia traumatic brain injury secondary brain injury');
+  if (hasPolytrauma)                              pubmedQueries.push('polytrauma traumatic brain injury combined management');
+  if (input.sex === 'female' && input.pregnancy)  pubmedQueries.push('traumatic brain injury pregnancy management outcomes');
+  if (input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness)
+                                                  pubmedQueries.push('traumatic subarachnoid hemorrhage meningeal signs lumbar puncture');
+  if (input.cchrAdditional.basalSkullFracture)    pubmedQueries.push('basal skull fracture traumatic brain injury CSF leak');
+  if (gcsTotal <= 8 && ctNormal)                  pubmedQueries.push('diffuse axonal injury MRI traumatic brain injury normal CT');
+
+  const pubmedQuery = pubmedQueries[0] ?? 'traumatic brain injury management guidelines';
 
   // ════════════════════════════════════════════════════════════════════
   // REASONS VA SOURCES
@@ -994,7 +1149,8 @@ export function analyze(
       vital:   { score: vitalScore,   weight: 0,               contribution: 0,                                          rules: vitalRules },
     },
     treatmentTactics, surgicalUrgency, hematomaSurgery,
-    pubmedQuery: pubmedTerms.slice(0, 3).join(' AND '),
+    pubmedQuery,
+    pubmedQueries,
     disclaimer: "Bu tizim klinik qaror qabul qilishni qo'llab-quvvatlash uchun mo'ljallangan. Har bir tavsiya klinik kontekst va shifokor hukmiga bog'liq. Yakuniy qaror doimo shifokorga tegishli.",
     patientInfo: {
       age:             input.age,

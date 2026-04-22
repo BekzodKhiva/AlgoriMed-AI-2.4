@@ -91,7 +91,10 @@ export default function ResultPage() {
       setResult(r);
       if (r.pubmedQuery) {
         setPubmedLoading(true);
-        fetch(`/api/pubmed?q=${encodeURIComponent(r.pubmedQuery)}`)
+        const qp = r.pubmedQueries && r.pubmedQueries.length > 1
+          ? `&queries=${encodeURIComponent(JSON.stringify(r.pubmedQueries.slice(1, 5)))}`
+          : '';
+        fetch(`/api/pubmed?q=${encodeURIComponent(r.pubmedQuery)}${qp}`)
           .then(res => res.json())
           .then(d => { setArticles(d.articles ?? []); setPubmedLoading(false); })
           .catch(() => setPubmedLoading(false));
@@ -484,7 +487,7 @@ export default function ResultPage() {
                             minWidth: 58, fontSize: 11, fontWeight: 700, textAlign: 'center',
                             color: '#e67e22', padding: '2px 6px',
                             background: 'rgba(230,126,34,0.09)', borderRadius: 4,
-                          }}>TA&apos;SIR</span>
+                          }}>MEXANIZM</span>
                           <span style={{ fontSize: 13, color: 'var(--text)', paddingTop: 1 }}>{entry.effect}</span>
                         </div>
 
@@ -494,7 +497,7 @@ export default function ResultPage() {
                             minWidth: 58, fontSize: 11, fontWeight: 700, textAlign: 'center',
                             color: '#c0392b', padding: '2px 6px',
                             background: 'rgba(192,57,43,0.09)', borderRadius: 4,
-                          }}>XAVF</span>
+                          }}>MA&apos;NO</span>
                           <span style={{ fontSize: 13, color: 'var(--text)', paddingTop: 1 }}>{entry.impact}</span>
                         </div>
 
@@ -606,7 +609,14 @@ export default function ResultPage() {
                 </div>
               ) : (
                 <div className={styles.pubmedEmpty}>
-                  <p>Ushbu so&apos;rov uchun maqolalar topilmadi</p>
+                  <p>PubMed dan maqolalar topilmadi</p>
+                  <p style={{ fontSize: 12, marginTop: 6, opacity: 0.7 }}>
+                    <a href={`https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(result.pubmedQuery)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+                      PubMed da to&apos;g&apos;ridan qidirish →
+                    </a>
+                  </p>
                 </div>
               )}
             </div>
