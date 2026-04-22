@@ -231,7 +231,7 @@ export function analyze(
     vitalRules.push({
       id: 'VIT-ABD', name: 'Qorin + gipotenziya',
       protocol: 'WSES', riskLevel: 'high',
-      description: `Qorin og'rig'i + SBP ${sbp} mmHg < 90 — qorin ichki qon ketishi + TBI. Ikki jarroh zarur (WSES 2020)`,
+      description: `Qorin og'rig'i + SBP ${sbp} mmHg < 90 — qorin ichki qon ketishi + TBI. Ikkala jarroh maslahat tavsiya etiladi (WSES 2020)`,
       weight: 0.85
     });
     xaiEntries.push({
@@ -455,7 +455,7 @@ export function analyze(
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
     btfRules.push({
       id: 'BTF-MC-CF', name: 'Kontuziya + Suyak sinishi', protocol: 'BTF', riskLevel: 'high',
-      description: "Miya kontuziyasi + Suyak sinishi — kombinatsiyalangan jarohat, neyrojarroh maslahat tavsiya etiladi"rojarroh konsultatsiyasi zarur (BTF 2016)",
+      description: "Miya kontuziyasi + Suyak sinishi — kombinatsiyalangan jarohat, neyrojarroh maslahat tavsiya etiladi (BTF 2016)",
       weight: 0.65
     });
   }
@@ -617,14 +617,14 @@ export function analyze(
   // K4: Antikoagulyant + har qanday TBI (Cohen 2006, EFNS)
   if (input.anticoagulant && hierarchyOverride === null) {
     hierarchyOverride = 'ct_mandatory';
-    overrideReasons.push("Antikoagulyant + TBI → CT majburiy (Cohen 2006)");
+    overrideReasons.push("Antikoagulyant + TBI → CT tavsiya etiladi (Cohen 2006)");
   }
 
   // K17: GCS <= 8 (BTF 2016)
   if (gcsTotal <= 8 && hierarchyOverride === null) {
     hierarchyOverride = 'urgent';
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
-    overrideReasons.push(`GCS ${gcsTotal} <= 8 — og'ir TBI, shoshilinch CT zarur`);
+    overrideReasons.push(`GCS ${gcsTotal} <= 8 — og'ir TBI, shoshilinch CT tavsiya etiladi`);
   }
 
   // K12: 65+ yosh + antikoagulyant (NICE 2023)
@@ -636,7 +636,7 @@ export function analyze(
   // K26: Koagulopatiya + TBI (ACS TQIP 2023)
   if (comorbidities.includes('coagulopathy') && hierarchyOverride === null) {
     hierarchyOverride = 'ct_mandatory';
-    overrideReasons.push("Koagulopatiya + TBI → CT majburiy (ACS TQIP 2023)");
+    overrideReasons.push("Koagulopatiya + TBI → CT tavsiya etiladi (ACS TQIP 2023)");
   }
 
   // K10: Meningeal belgilar + gematoma (BTF + NICE)
@@ -644,13 +644,13 @@ export function analyze(
       && hasHematoma && hierarchyOverride === null) {
     hierarchyOverride = 'urgent';
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
-    overrideReasons.push("Meningeal belgilar + gematoma → neyrojarroh DARHOL (NICE 2023, BTF 2016)");
+    overrideReasons.push("Meningeal belgilar + gematoma → neyrojarroh maslahat tavsiya etiladi (NICE 2023, BTF 2016)");
   }
 
   // K6: Alkogol + GCS <= 12 (Sperry 2006, NICE 2023)
   if (input.alcoholIntoxication && gcsTotal <= 12 && hierarchyOverride === null) {
     hierarchyOverride = 'ct_mandatory';
-    overrideReasons.push(`Alkogol + GCS ${gcsTotal} <= 12 → CT majburiy, GCS ishonchsiz (Sperry 2006)`);
+    overrideReasons.push(`Alkogol + GCS ${gcsTotal} <= 12 → CT tavsiya etiladi, GCS ishonchsiz bo'lishi mumkin (Sperry 2006)`);
   }
 
   // K18: Alkogol + GCS <= 8 (BTF + CCHR)
@@ -670,13 +670,13 @@ export function analyze(
   // ── DARAJA 3: O'RTA XAVF ─────────────────────────────────────────────
 
   if (input.anticoagulant && ctNormal && hierarchyOverride === null) {
-    overrideReasons.push("Antikoagulyant + CT normal → 24 soat yotqizish MAJBURIY (Cohen 2006)");
+    overrideReasons.push("Antikoagulyant + CT normal → 24 soat yotqizish tavsiya etiladi (Cohen 2006)");
   }
   if (cchrScore >= 30 && ctNormal) {
-    overrideReasons.push("CCHR yuqori xavf + CT normal → kuzatish zarur (NICE 2023)");
+    overrideReasons.push("CCHR yuqori xavf + CT normal → kuzatish tavsiya etiladi (NICE 2023)");
   }
   if ((input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness) && ctNormal) {
-    overrideReasons.push("Meningeal belgilar + CT normal → LP ko'rsatmasi (SAQ istisno qilinsin)");
+    overrideReasons.push("Meningeal belgilar + CT normal → LP ko'rib chiqilishi tavsiya etiladi (SAQ ehtimolini istisno qilish)");
   }
   if (input.sex === 'female' && input.pregnancy) {
     overrideReasons.push("Homilador bemor: CT bajarilsa qorin himoyasi + akusher koordinatsiya");
@@ -688,7 +688,7 @@ export function analyze(
     overrideReasons.push("Gipertenziya tarixi: MAP >= 90 mmHg maqsad (nisbiy gipotenziya xavfi)");
   }
   if (input.complaints.seizure && gcsTotal <= 12) {
-    overrideReasons.push("Tutqanoq + GCS <= 12 → CT darhol bajarilsin (BTF 2016)");
+    overrideReasons.push("Tutqanoq + GCS <= 12 → CT shoshilinch bajarilishi tavsiya etiladi (BTF 2016)");
   }
   if (gcsTotal <= 8 && ctNormal) {
     overrideReasons.push("GCS <= 8 + CT normal → Diffuz Aksonal Jarohat (DAJ) ehtimoli, MRI ko'rsatmasi");
@@ -796,35 +796,35 @@ export function analyze(
 
   if (surgicalUrgency === 'emergency') {
     treatmentTactics = [
-      "FAVQULODDA: Neyrojarroh bilan DARHOL maslahat zarur",
+      "Neyrojarroh bilan shoshilinch maslahat tavsiya etiladi",
       "Shoshilinch KT (agar bajarilmagan) — KT natijasiga qarab jarrohlik qaror qilinadi",
       "ICP oshishi gumon qilinsa — IV mannitol ko'rib chiqish mumkin (1 g/kg)",
       "Bosh 30 daraja ko'tarilgan holda ushlab turish ko'rib chiqilsin",
-      "GCS har 15 daqiqada baholang",
-      "MAP 80 mmHg va undan yuqori ushlab turish maqsadini ko'rib chiqing",
+      "GCS har 15 daqiqada baholanishi tavsiya etiladi",
+      "MAP 80 mmHg va undan yuqori ushlab turish maqsadi ko'rib chiqilsin",
       "Bemor NPO (bo'sh qorin) holatida saqlash tavsiya etiladi",
     ];
   } else if (surgicalUrgency === 'urgent') {
     treatmentTactics = [
-      "Neyrojarroh bilan shoshilinch maslahatni ko'rib chiqing",
+      "Neyrojarroh bilan shoshilinch maslahat tavsiya etiladi",
       "Neyrojarrohlik bo'limiga yotqizish tavsiya etiladi",
-      "6-12 soatdan keyin KT takrorlashni ko'rib chiqing",
+      "6-12 soatdan keyin KT takrorlash tavsiya etiladi",
       "Har soatda nevrologik monitoring tavsiya etiladi",
       "Bemor NPO holatida saqlash tavsiya etiladi",
     ];
   } else if (surgicalUrgency === 'monitor') {
     treatmentTactics = [
       "Neyrojarroh bilan maslahat tavsiya etiladi",
-      "6-12 soatdan keyin KT takrorlashni ko'rib chiqing",
+      "6-12 soatdan keyin KT takrorlash tavsiya etiladi",
       "Neyrojarrohlik bo'limiga yotqizish ko'rib chiqilsin",
       "Har soatda nevrologik monitoring tavsiya etiladi",
     ];
   } else if (decision === 'IMMEDIATE_CT' || decision === 'CT_REQUIRED') {
     treatmentTactics = [
-      "KT skanini shoshilinch bajarishni ko'rib chiqing",
+      "KT skanini shoshilinch bajarish tavsiya etiladi",
       "KT natijasi ma'lum bo'lgunicha bemorni kuzatib boring",
-      "Venoz kirish yo'li ta'minlanishini ko'rib chiqing",
-      "GCS har 30 daqiqada baholang",
+      "Venoz kirish yo'li ta'minlanishi tavsiya etiladi",
+      "GCS har 30 daqiqada baholanishi tavsiya etiladi",
       "Nevrologik o'zgarishlarni kuzatib boring",
     ];
   } else if (decision === 'CT_RECOMMENDED') {
@@ -848,23 +848,23 @@ export function analyze(
   if (hasSBP && sbp < 90 && hasSpO2 && spO2 < 90) {
     // Ikkalasi kritik — bitta birlashgan tavsiya, birinchi qo'yiladi
     vitalTactics.push(
-      `KRITIK: SpO2 ${spO2}% + SBP ${sbp} mmHg — oksigenatsiya VA qon bosimni BIRGALIKDA tiklash zarur (EPIC Study 2021, OR 6.1)`
+      `KRITIK: SpO2 ${spO2}% + SBP ${sbp} mmHg — oksigenatsiya VA qon bosimni birgalikda tiklash tavsiya etiladi (EPIC Study 2021, OR 6.1)`
     );
   } else {
     // SpO2 birinchi — Airway/Breathing (A va B ABCDE bo'yicha)
     if (hasSpO2 && spO2 < 90) {
       vitalTactics.push(
-        `SpO2 ${spO2}% (kritik) — yuqori oqimli O2 yoki intubatsiya ko'rsatmasini baholang. Maqsad SpO2 94% va undan yuqori (BTF 2023)`
+        `SpO2 ${spO2}% (kritik) — yuqori oqimli O2 yoki intubatsiya ko'rsatmasini baholash tavsiya etiladi. Maqsad SpO2 94% va undan yuqori (BTF 2023)`
       );
     } else if (hasSpO2 && spO2 < 94) {
       vitalTactics.push(
-        `SpO2 ${spO2}% — O2 terapiyasini ko'rib chiqing (non-rebreather mask). Maqsad 94% va undan yuqori (BTF 2023)`
+        `SpO2 ${spO2}% — O2 terapiyasi tavsiya etiladi (non-rebreather mask). Maqsad 94% va undan yuqori (BTF 2023)`
       );
     }
     // SBP ikkinchi — Circulation (C)
     if (hasSBP && sbp < 90) {
       vitalTactics.push(
-        `SBP ${sbp} mmHg (kritik) — MAP 80 mmHg va undan yuqori tiklashni ko'rib chiqing: suyuqlik va vazopresorlar ko'rsatmasini baholang (BTF 2016/2023)`
+        `SBP ${sbp} mmHg (kritik) — MAP 80 mmHg va undan yuqori tiklash tavsiya etiladi: suyuqlik va vazopresorlar ko'rsatmasini baholash tavsiya etiladi (BTF 2016/2023)`
       );
     } else if (hasSBP && sbp < 110) {
       vitalTactics.push(
@@ -878,22 +878,22 @@ export function analyze(
   // ── POLITRAVMA TAKTIKASI ──────────────────────────────────────────────
   if (hasPolytrauma) {
     treatmentTactics.push(
-      `Qo'shimcha jarohatlar (${polytravmaZones.join(', ')}) — cABCDE Primary Survey to'liq bajarilishini ko'rib chiqing (WSES 2019)`
+      `Qo'shimcha jarohatlar (${polytravmaZones.join(', ')}) — cABCDE Primary Survey to'liq bajarilishi tavsiya etiladi (WSES 2019)`
     );
   }
   if (input.complaints?.chestPain && hasSpO2 && spO2 < 94) {
     treatmentTactics.push(
-      `Ko'krak og'rig'i + SpO2 ${spO2}% — ko'krak X-ray / FAST tekshiruvi ko'rib chiqilsin; pnevmotoraks istisno qilinsin (WSES 2019)`
+      `Ko'krak og'rig'i + SpO2 ${spO2}% — ko'krak X-ray / FAST tekshiruvi tavsiya etiladi; pnevmotoraks ehtimolini istisno qilish tavsiya etiladi (WSES 2019)`
     );
   }
   if (input.complaints?.abdominalPain && hasSBP && sbp < 90) {
     treatmentTactics.push(
-      `Qorin og'rig'i + gipotenziya — FAST USS darhol ko'rib chiqilsin; FAST(+) + beqarorlik bo'lsa laparotomiya ko'rsatmasini baholang (WSES 2020)`
+      `Qorin og'rig'i + gipotenziya — FAST USS tavsiya etiladi; FAST(+) + beqarorlik bo'lsa laparotomiya ko'rsatmasini baholash tavsiya etiladi (WSES 2020)`
     );
   }
   if (rtsScore !== undefined && rtsScore < 5) {
     treatmentTactics.push(
-      `RTS ${rtsScore} (norma 7.84) — travma markazi aktivatsiyasi ko'rsatmasini baholang (Boyd 1987)`
+      `RTS ${rtsScore} (norma 7.84) — travma markazi aktivatsiyasi ko'rsatmasini baholash tavsiya etiladi (Boyd 1987)`
     );
   }
 
@@ -907,33 +907,33 @@ export function analyze(
   if (input.anticoagulant && hasHematoma)
     treatmentTactics.push("Antikoagulyant + gematoma: reversal terapiya ko'rib chiqilsin (warfarin → 4F-PCC; DOAC → idarucizumab/andexanet)");
   if (input.anticoagulant && hasContusion)
-    treatmentTactics.push("Antikoagulyant + kontuziya: reversal terapiyani ko'rib chiqing — kechikkan qon ketish xavfi (BTF 2016, Cohen 2006)");
+    treatmentTactics.push("Antikoagulyant + kontuziya: reversal terapiya ko'rib chiqilishi tavsiya etiladi — kechikkan qon ketish xavfi (BTF 2016, Cohen 2006)");
   if (hasContusion)
-    treatmentTactics.push("Miya kontuziyasi: 6–12 soatdan keyin KT takrorlashni ko'rib chiqing — o'lcham oshishi kuzatilsin (BTF 2016)");
+    treatmentTactics.push("Miya kontuziyasi: 6–12 soatdan keyin KT takrorlash tavsiya etiladi — o'lcham oshishi kuzatilsin (BTF 2016)");
   if (hasFracture)
-    treatmentTactics.push("Bosh suyagi sinishi: neyrojarroh konsultatsiyasini ko'rib chiqing; agar asos suyagi belgilari bo'lsa — DARHOL (BTF 2016)");
+    treatmentTactics.push("Bosh suyagi sinishi: neyrojarroh maslahat tavsiya etiladi; asos suyagi sinishi belgilari bo'lsa — tezkor baholash tavsiya etiladi (BTF 2016)");
   if (gcsTotal <= 8 && ctNormal)
-    treatmentTactics.push("GCS <= 8 + CT normal: Diffuz Aksonal Jarohat (DAJ) ehtimoli — MRI buyurishni ko'rib chiqing (ACS TQIP 2023)");
+    treatmentTactics.push("GCS <= 8 + CT normal: Diffuz Aksonal Jarohat (DAJ) ehtimoli — MRI tavsiya etiladi (ACS TQIP 2023)");
   if ((input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness) && ctNormal)
-    treatmentTactics.push("Meningeal belgilar + CT normal: LP (lyumbar punksiya) ko'rsatmasini ko'rib chiqing — SAQ istisno qilinsin");
+    treatmentTactics.push("Meningeal belgilar + CT normal: LP (lyumbar punksiya) ko'rib chiqilishi tavsiya etiladi — SAQ ehtimolini istisno qilish");
   if (comorbidities.includes('coagulopathy'))
-    treatmentTactics.push("Koagulopatiya: INR tekshiruvi va reversal terapiya (4F-PCC) ko'rsatmasini baholang (ACS TQIP 2023)");
+    treatmentTactics.push("Koagulopatiya: INR tekshiruvi va reversal terapiya (4F-PCC) ko'rib chiqilishi tavsiya etiladi (ACS TQIP 2023)");
   if (comorbidities.includes('epilepsy'))
     treatmentTactics.push("Epilepsiya tarixi: profilaktik antiepileptik ko'rib chiqilsin (Levetiracetam / Fenitoin 7 kun) — BTF 2016");
   if (comorbidities.includes('stroke'))
-    treatmentTactics.push("Insult tarixi: antitrombotik dorilar bor bo'lsa reversal ko'rsatmasini baholang; bazal GCS ni aniqlash muhim");
+    treatmentTactics.push("Insult tarixi: antitrombotik dorilar mavjud bo'lsa reversal ko'rib chiqilishi tavsiya etiladi; bazal GCS ni aniqlash tavsiya etiladi");
   if (comorbidities.includes('dementia'))
-    treatmentTactics.push("Demensiya: bazal GCS ma'lum bo'lsa shu bilan taqqoshlang; oila / parvarish xodimidan ma'lumot oling");
+    treatmentTactics.push("Demensiya: bazal GCS ma'lum bo'lsa shu bilan taqqoslash tavsiya etiladi; oila / parvarish xodimidan ma'lumot olish tavsiya etiladi");
   if (comorbidities.includes('heart_failure'))
-    treatmentTactics.push("Yurak yetishmovchiligi: MAP monitoring tavsiya etiladi; suyuqlik yuklashda ehtiyotkorlik zarur");
+    treatmentTactics.push("Yurak yetishmovchiligi: MAP monitoring tavsiya etiladi; suyuqlik yuklashda ehtiyotkorlik tavsiya etiladi");
   if (comorbidities.includes('copd'))
     treatmentTactics.push("COPD: SpO2 bazal darajasi past bo'lishi mumkin — maqsad 94–96% (92% emas)");
   if (comorbidities.includes('cancer'))
-    treatmentTactics.push("Onkologik kasallik: metastaz ehtimoli — MRI ko'rsatmasini ko'rib chiqing");
+    treatmentTactics.push("Onkologik kasallik: metastaz ehtimoli — MRI tavsiya etiladi");
   if (comorbidities.includes('renal'))
-    treatmentTactics.push("Buyrak yetishmovchiligi: kontrastli KT da ehtiyotkorlik; dori dozalarini moslashtiring");
+    treatmentTactics.push("Buyrak yetishmovchiligi: kontrastli KT da ehtiyotkorlik tavsiya etiladi; dori dozalarini moslashtirish tavsiya etiladi");
   if (comorbidities.includes('immunosuppression'))
-    treatmentTactics.push("Immunosupressiya: infeksiya xavfi yuqori — isitma bo'lsa LP ko'rsatmasini ko'rib chiqing");
+    treatmentTactics.push("Immunosupressiya: infeksiya ehtimoli yuqori — isitma bo'lsa LP ko'rib chiqilishi tavsiya etiladi");
 
   // ════════════════════════════════════════════════════════════════════
   // XAI KENGAYTIRISH — GCS, CCHR, BTF, NICE, Alkogol, Yosh
