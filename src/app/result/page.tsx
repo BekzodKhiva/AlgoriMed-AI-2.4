@@ -11,23 +11,23 @@ interface PubMedArticle { pmid: string; title: string; authors: string; journal:
 const DECISION_UZ: Record<string, string> = {
   NO_CT_REQUIRED:      'KT TALAB ETILMAYDI',
   CT_RECOMMENDED:      'KT TAVSIYA ETILADI',
-  CT_REQUIRED:         'KT BAJARISH ZARUR',
-  IMMEDIATE_CT:        'SHOSHILINCH KT',
-  SURGICAL_EVALUATION: 'JARROHLIK BAHOLASH',
+  CT_REQUIRED:         'KT TAVSIYA ETILADI',
+  IMMEDIATE_CT:        'SHOSHILINCH KT TAVSIYA ETILADI',
+  SURGICAL_EVALUATION: 'JARROHLIK BAHOLASH TAVSIYA ETILADI',
 };
 
 const DECISION_UZ_CT_DONE: Record<string, string> = {
   NO_CT_REQUIRED:      'KUZATISH YETARLI',
   CT_RECOMMENDED:      'DINAMIK KUZATISH',
   CT_REQUIRED:         'NEYROLOGIK MONITORING',
-  SURGICAL_EVALUATION: 'JARROHLIK BAHOLASH',
+  SURGICAL_EVALUATION: 'JARROHLIK BAHOLASH TAVSIYA ETILADI',
 };
 
 const DECISION_DESC: Record<string, string> = {
   NO_CT_REQUIRED:      "Hozirgi klinik ko'rsatkichlar asosida KT skanini bajarish talab etilmaydi.",
   CT_RECOMMENDED:      'Ehtiyot chorasi sifatida KT bajarish tavsiya etiladi.',
   CT_REQUIRED:         "Klinik ko'rsatmalar asosida KT skanini bajarish tavsiya etiladi.",
-  IMMEDIATE_CT:        'Kechiktirishsiz shoshilinch KT bajarish talab etiladi.',
+  IMMEDIATE_CT:        'Shoshilinch KT bajarish tavsiya etiladi.',
   SURGICAL_EVALUATION: 'Neyrojarroh bilan maslahat va jarrohlik baholash tavsiya etiladi.',
 };
 
