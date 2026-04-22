@@ -166,7 +166,7 @@ export default function ResultPage() {
               )}
               {result.hasPolytrauma && result.polytravmaZones && result.polytravmaZones.length > 0 && (
                 <div className={styles.metaChip} style={{ color: '#993C1D', fontWeight: 600 }}>
-                  🏥 Politravma: {result.polytravmaZones.join(', ')}
+                  🏥 Qo'shimcha jarohatlar: {result.polytravmaZones.join(', ')}
                 </div>
               )}
               {result.analyzedAt && (
@@ -268,10 +268,10 @@ export default function ResultPage() {
               </div>
             </div>
 
-            {/* Politravma + RTS */}
+            {/* Qo'shimcha jarohatlar + RTS */}
             {(result.hasPolytrauma || result.rtsScore !== undefined) && (
               <div className={styles.section}>
-                <h2 className={styles.sectionTitle}>Politravma va vital belgilar</h2>
+                <h2 className={styles.sectionTitle}>Qo'shimcha jarohatlar va vital belgilar</h2>
                 <div style={{ display: 'grid', gap: 10 }}>
                   {result.rtsScore !== undefined && (
                     <div style={{
@@ -301,7 +301,7 @@ export default function ResultPage() {
                       background: 'rgba(154,60,29,0.06)', border: '1px solid #993C1D',
                     }}>
                       <div style={{ fontWeight: 600, fontSize: 14, color: '#993C1D', marginBottom: 6 }}>
-                        🏥 Politravma aniqlandi — WSES 2019/2020 · CRASH model
+                        🏥 Qo'shimcha jarohatlar aniqlandi — WSES 2019/2020 · CRASH model
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {result.polytravmaZones.map((z: string) => (

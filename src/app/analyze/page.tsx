@@ -587,7 +587,7 @@ export default function AnalyzePage() {
                 )}
               </div>
 
-              {/* Politravma shikoyatlari */}
+              {/* Qo'shimcha jarohatlar shikoyatlari */}
               <div className={styles.card}>
                 <h3 className={styles.cardTitle}>Qo&apos;shimcha jarohatlar — boshqa soha shikoyatlari</h3>
                 <p className={styles.cardDesc}>WSES 2019/2020 · CRASH model · cABCDE Primary Survey</p>
