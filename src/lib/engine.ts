@@ -80,7 +80,7 @@ export function analyze(
   const hasHematoma  = ctFindings.includes('hematoma');
   const hasContusion = ctFindings.includes('contusion');
   const hasFracture  = ctFindings.includes('fracture');
-  const ctDone       = input.ctStatus !== 'not_done' || ctFindings.length > 0;
+  const ctDone       = (input.ctStatus === 'normal') || ctFindings.length > 0;
   const ctNormal     = input.ctStatus === 'normal' && ctFindings.length === 0;
 
   // Vital signs mavjudligi
@@ -312,8 +312,9 @@ export function analyze(
 
     if (vol < 10 && !epiduralBigThick) {
       btfScore = 35; hematomaSurgery = 'observe';
+      surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
       btfRules.push({ id: 'BTF-H1', name: 'BTF < 10ml', protocol: 'BTF', riskLevel: 'medium',
-        description: `Gematoma ${vol}ml — konservativ, dinamik kuzatish`, weight: 0.35 });
+        description: `Gematoma ${vol}ml — konservativ, dinamik kuzatish tavsiya etiladi`, weight: 0.35 });
     } else if (vol >= 10 && vol < 30 && shift <= 5 && !epiduralBigThick) {
       if (type === 'subdural' && gcsTotal <= 8) {
         // K13: Subdural + GCS <= 8 → jarrohlik (BTF 2016)
@@ -473,10 +474,56 @@ export function analyze(
     xaiEntries.push({
       fact:   "KT: Gematoma + Kontuziya + Suyak sinishi — uchala topilma birgalikda",
       effect: "Eng og'ir TBI kombinatsiyasi — qon ketish, to'qima zarari va mexanik buzilish",
-      impact: "FAVQULODDA neyrojarrohlik baholash; hayot uchun xavfli holat",
+      impact: "Neyrojarrohlik baholash tavsiya etiladi; hayot uchun xavfli holat ehtimoli yuqori",
       source: "BTF 2016, ENLS 6.0, ACS TQIP 2023"
     });
   }
+
+  // ── QOLGAN MISSING KOMBINATSIYALAR (hujjat 40 kombinatsiya) ─────────
+
+  // K_POL_GCS: Qo'shimcha jarohatlar + GCS ≤ 8 — cABCDE va neyro parallel
+  if (hasPolytrauma && gcsTotal <= 8) {
+    btfScore = Math.max(btfScore, 80);
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+    btfRules.push({
+      id: 'BTF-POL-GCS', name: "Qo'shimcha jarohat + GCS≤8", protocol: 'BTF', riskLevel: 'high',
+      description: `Qo'shimcha jarohatlar + GCS ${gcsTotal} ≤ 8 — cABCDE parallel va neyrojarroh maslahat tavsiya etiladi (WSES 2019, BTF 2016)`,
+      weight: 0.80
+    });
+  }
+
+  // K_ALK_HEM: Alkogol + gematoma — alkogol GCS ni yashiradi
+  if (input.alcoholIntoxication && hasHematoma) {
+    btfScore = Math.max(btfScore, 75);
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+    btfRules.push({
+      id: 'BTF-ALK-HEM', name: "Alkogol + Gematoma", protocol: 'BTF', riskLevel: 'high',
+      description: "Alkogol intoksikatsiyasi + gematoma — GCS ishonchsiz bo'lishi mumkin, haqiqiy holat og'irroq ehtimoli. Neyrojarroh maslahat tavsiya etiladi",
+      weight: 0.75
+    });
+  }
+
+  // K_EPI_SEI: Epilepsiya tarixi + jarohatdan keyin tutqanoq
+  if (comorbidities.includes('epilepsy') && input.complaints.seizure) {
+    btfScore = Math.max(btfScore, 60);
+    btfRules.push({
+      id: 'BTF-EPI-SEI', name: "Epilepsiya + Tutqanoq", protocol: 'BTF', riskLevel: 'high',
+      description: "Epilepsiya tarixi + jarohatdan keyin tutqanoq — profilaktik antiepileptik va KT tavsiya etiladi (BTF 2016)",
+      weight: 0.60
+    });
+  }
+
+  // K_AGE_HEM: Yosh ≥65 + gematoma (hajmidan qat'iy nazar)
+  if (input.age >= 65 && hasHematoma) {
+    btfScore = Math.max(btfScore, 70);
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
+    btfRules.push({
+      id: 'BTF-AGE-HEM', name: "65+ yosh + Gematoma", protocol: 'BTF', riskLevel: 'high',
+      description: "Yosh ≥65 + gematoma — keksa yoshda klinik yomonlashish tez bo'lishi mumkin, neyrojarroh maslahat tavsiya etiladi (BTF 2016)",
+      weight: 0.70
+    });
+  }
+
 
   // CN IV / VI — ko'z harakat buzilishi → ICP oshishi (K24)
   if (input.cranialNerves?.cn4 === 'P' || input.cranialNerves?.cn6 === 'P') {
@@ -597,7 +644,7 @@ export function analyze(
     btfScore = 100;
     surgicalUrgency = worstSurgical(surgicalUrgency, 'emergency');
     btfRules.push({ id: 'BTF-CN3', name: 'CN III Patologik', protocol: 'BTF', riskLevel: 'high',
-      description: "CN III falaji — herniatsiya ehtimoli. FAVQULODDA neyrojarrohlik baholash + shoshilinch KT (BTF 2016)", weight: 1.0 });
+      description: "CN III falaji — herniatsiya ehtimoli. Neyrojarrohlik baholash va shoshilinch KT tavsiya etiladi (BTF 2016)", weight: 1.0 });
     overrideReasons.push("CN III falaji — herniatsiya belgisi");
   }
 
@@ -664,7 +711,7 @@ export function analyze(
   if (comorbidities.includes('coagulopathy') && hasHematoma && hierarchyOverride !== 'emergency') {
     hierarchyOverride = 'urgent';
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
-    overrideReasons.push("Koagulopatiya + gematoma → reversal terapiya + shoshilinch jarrohlik (ACS TQIP 2023)");
+    overrideReasons.push("Koagulopatiya + gematoma → reversal terapiya va neyrojarroh maslahat tavsiya etiladi (ACS TQIP 2023)");
   }
 
   // ── DARAJA 3: O'RTA XAVF ─────────────────────────────────────────────
@@ -899,7 +946,7 @@ export function analyze(
 
   // ── KOMBINATSIYALARGA ASOSLANGAN TAKTIKALAR ───────────────────────────
   if (input.alcoholIntoxication)
-    treatmentTactics.push("Alkogol: hushyor bo'lganda GCS qayta baholansin; 4–6 soat ichida klinik qayta ko'rish tavsiya etiladi (NICE 2023)");
+    treatmentTactics.push("Alkogol: hushyor bo'lganda GCS qayta baholanishi tavsiya etiladi; 4–6 soat ichida klinik qayta ko'rish tavsiya etiladi (NICE 2023)");
   if (input.sex === 'female' && input.pregnancy)
     treatmentTactics.push("Homilador: akusher-ginekolog bilan koordinatsiya; KT bajarilsa qorin sohasini qo'rg'oshin ekran bilan himoya qilish tavsiya etiladi");
   if (input.anticoagulant && ctNormal)
