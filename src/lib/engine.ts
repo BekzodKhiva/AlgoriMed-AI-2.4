@@ -20,6 +20,8 @@ import {
   ClinicalInput, AnalysisResult, TriggeredRule,
   Decision, Urgency, Severity, XaiEntry
 } from './types';
+import { assessPhysiology, rtsCode_GCS, rtsCode_SBP, rtsCode_RR } from './modules/physiology';
+import { assessNeuro, validateGCS as validateGCSModule } from './modules/neuro';
 
 // ── PROTOKOL VAZNLARI (ilmiy asoslangan) ─────────────────────────────────
 // ARXITEKTURA IZOHI (FIX 1 — WEIGHTS contradiction hal qilindi):
@@ -46,37 +48,7 @@ const WEIGHTS = {
   alcohol: 0.05,  // Sperry 2006 — GCS ishonchsizligi modifikatori
 };
 
-// ── RTS KODLASH (Boyd et al. 1987, ilmiy validatsiya qilingan) ───────────
-// FIX 4: GCS input validation — dirty data → noto'g'ri decision oldini olish
-function validateGCS(eye: number, verbal: number, motor: number): void {
-  if (eye < 1 || eye > 4)       throw new RangeError(`GCS Ko'z (E) xato: ${eye}. Diapazon: 1–4`);
-  if (verbal < 1 || verbal > 5) throw new RangeError(`GCS So'z (V) xato: ${verbal}. Diapazon: 1–5`);
-  if (motor < 1 || motor > 6)   throw new RangeError(`GCS Harakat (M) xato: ${motor}. Diapazon: 1–6`);
-  const total = eye + verbal + motor;
-  if (total < 3 || total > 15)  throw new RangeError(`GCS jami xato: ${total}. Diapazon: 3–15`);
-}
-
-function rtsCode_GCS(gcs: number): number {
-  if (gcs >= 13) return 4;
-  if (gcs >= 9)  return 3;
-  if (gcs >= 6)  return 2;
-  if (gcs >= 4)  return 1;
-  return 0;
-}
-function rtsCode_SBP(sbp: number): number {
-  if (sbp > 89) return 4;
-  if (sbp > 75) return 3;
-  if (sbp > 49) return 2;
-  if (sbp > 0)  return 1;
-  return 0;
-}
-function rtsCode_RR(rr: number): number {
-  if (rr >= 10 && rr <= 29) return 4;
-  if (rr > 29)              return 3;
-  if (rr >= 6)              return 2;
-  if (rr >= 1)              return 1;
-  return 0;
-}
+// validateGCS, rtsCode_GCS, rtsCode_SBP, rtsCode_RR — modules/physiology.ts va neuro.ts dan import qilindi
 
 // ── PROTOKOL PRIORITET QATLAMI (FIX 5: conflict resolution) ─────────────
 // Ziddiyatli protokol xulosaları bo'lganda BTF > CCHR > NICE tartibida ishlatiladi
@@ -127,9 +99,8 @@ export function analyze(
   input: ClinicalInput & { otherMechanismLabel?: string }
 ): AnalysisResult {
 
-  // ── FIX 4: GCS VALIDATSIYA — kirish paytida tekshirish ─────────────────
-  // Noto'g'ri GCS → butun engine noto'g'ri qaror chiqaradi
-  validateGCS(input.gcs.eye, input.gcs.verbal, input.gcs.motor);
+  // ── FIX 4: GCS VALIDATSIYA — modules/neuro.ts dan (markazlashtirilgan)
+  validateGCSModule(input.gcs.eye, input.gcs.verbal, input.gcs.motor);
 
   const gcsTotal     = input.gcs.eye + input.gcs.verbal + input.gcs.motor;
   const comorbidities = input.comorbidities ?? [];
@@ -250,205 +221,150 @@ export function analyze(
       analyzedAt: new Date().toISOString(),
     };
   }
-  // ════════════════════════════════════════════════════════════════════
-  // Alohida kritik holat: faqat SBP < 90 (SpO2 normal yoki kiritilmagan)
-  // Bu early return emas — lekin vitalOverride='urgent' sifatida saqlanadi
-  // ════════════════════════════════════════════════════════════════════
-  // Eng yuqori prioritet — hamma narsani override qiladi
-  // Manba: IMPACT model, BTF 2016/2023, EPIC Study 2021, ACS TBI 2024
-  // ════════════════════════════════════════════════════════════════════
-  const vitalRules: TriggeredRule[] = [];
-  let   vitalScore   = 0;
-  let   vitalOverride: 'emergency' | 'urgent' | null = null;
-  let   surgicalUrgency: AnalysisResult['surgicalUrgency'] = 'not_required';
 
-  // K_V1: Gipoksiya + Gipotenziya birgalikda — ENG YOMON KOMBINATSIYA
-  // EPIC Study 2021: adjusted OR 6.1 (individual effektlar yig'indisidan ko'p)
-  if (hasSBP && sbp < 90 && hasSpO2 && spO2 < 90) {
-    vitalScore    = 100;
-    vitalOverride = 'emergency';
-    surgicalUrgency = worstSurgical(surgicalUrgency, 'emergency');
-    vitalRules.push({
-      id: 'VIT-COMB', name: 'Gipoksiya + Gipotenziya',
+  // ── P2 FIX: ALOHIDA KRITIK SBP < 90 (SpO2 normal yoki kiritilmagan) ──
+  // BTF 2016: yolg'iz gipotenziya ham EMERGENCY — treatmentTactics to'liq bo'lishi uchun early return
+  if (hasSBP_early && sbp_early < 90 && !(hasSpO2_early && spO2_early < 90)) {
+    let earlySeverity: Severity;
+    if      (gcsTotal >= 13) earlySeverity = 'mild';
+    else if (gcsTotal >= 9)  earlySeverity = 'moderate';
+    else if (gcsTotal >= 6)  earlySeverity = 'severe';
+    else                     earlySeverity = 'critical';
+    const earlyRule: TriggeredRule = {
+      id: 'VIT-SBP1', name: 'Kritik gipotenziya — HARD OVERRIDE',
       protocol: 'VITAL', riskLevel: 'high',
-      description: `SpO2 ${spO2}% + SBP ${sbp} mmHg — SINERGISTIK ikkilamchi TBI jarohati (EPIC Study 2021, OR 6.1, 14x o'lim xavfi)`,
-      weight: 1.0
-    });
-    xaiEntries.push({
-      fact:   `SpO2 = ${spO2}%, SBP = ${sbp} mmHg`,
-      effect: 'Gipoksiya + gipotenziya birgalikda — miya qon ta\'minoti ikki tomondan buziladi',
-      impact: `O'lim xavfi ~14 baravar oshadi (adjusted OR 6.1, EPIC Study 2021)`,
-      source: 'EPIC Study 2021, BTF 2016, WSES 2019'
-    });
-  } else {
-    // K_V2: Kritik gipotenziya (SBP < 90) — BTF 2016 klassik chegara
-    // OR o'lim: prehospital 1.8, hospital 2.61, ikkalasi 4.36
-    if (hasSBP && sbp < 90) {
-      vitalScore    = Math.max(vitalScore, 90);
-      vitalOverride = vitalOverride ?? 'urgent';
-      surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
-      vitalRules.push({
-        id: 'VIT-SBP1', name: 'Kritik gipotenziya',
-        protocol: 'VITAL', riskLevel: 'high',
-        description: `SBP ${sbp} mmHg < 90 — KRITIK ikkilamchi TBI jarohati. OR o'lim: 4.36 (BTF 2016, WSES 2019)`,
-        weight: 0.90
-      });
-      xaiEntries.push({
-        fact:   `SBP = ${sbp} mmHg (chegara: 90 mmHg)`,
-        effect: 'Gipotenziya → serebral perfuziya bosimi (CPP) pasayadi → miya ishemiyasi → ikkilamchi TBI zararlanishi',
-        impact: `O'lim xavfi OR 4.36 (hospital gipotenziya). Serebral avtoregulyatsiya buziladi. Maqsad: SBP >= 110 mmHg (ACS TBI 2024)`,
+      description: `SBP ${sbp_early} mmHg < 90 — KRITIK ikkilamchi TBI jarohati. OR o'lim: 4.36 (BTF 2016)`,
+      weight: 0.90
+    };
+    return {
+      decision: 'SURGICAL_EVALUATION', urgency: 'EMERGENCY',
+      confidence: 0.92, confidencePenalties: !hasSpO2_early ? ["SpO2 kiritilmagan (−7%)"] : [],
+      score: 90, severity: earlySeverity, gcsTotal,
+      rtsScore: undefined, hasPolytrauma: false, polytravmaZones: [],
+      xaiEntries: [{
+        fact:   `SBP = ${sbp_early} mmHg (chegara: 90 mmHg)`,
+        effect: 'Gipotenziya → serebral perfuziya bosimi (CPP) pasayadi → miya ishemiyasi',
+        impact: `OR o'lim 4.36 (BTF 2016). Maqsad: SBP >= 110 mmHg (ACS TBI 2024)`,
         source: 'BTF 2016/2023, WSES 2019, ACS TBI 2024, IMPACT model'
-      });
-    }
-    // K_V3: Gipotenziya xavf zonasi (SBP 90–110) — ACS TBI 2024 yangilanishi
-    else if (hasSBP && sbp < 110) {
-      vitalScore = Math.max(vitalScore, 45);
-      vitalRules.push({
-        id: 'VIT-SBP2', name: 'Gipotenziya xavf zonasi',
-        protocol: 'VITAL', riskLevel: 'medium',
-        description: `SBP ${sbp} mmHg — xavfli zona (90–110). Maqsad >= 110 mmHg (ACS TBI 2024, BTF yoshga bog'liq chegara)`,
-        weight: 0.45
-      });
-      xaiEntries.push({
-        fact:   `SBP = ${sbp} mmHg (xavf zonasi: 90–110)`,
-        effect: 'Nisbiy gipotenziya → serebral avtoregulyatsiya chegarasida → CPP pasayishi xavfi',
-        impact: 'Secondary brain injury ehtimoli oshadi. Maqsad SBP >= 110 mmHg (ACS TBI 2024). Darhol monitoring zarur',
-        source: 'ACS TBI 2024, BTF 2023, IMPACT model'
-      });
-    }
+      }],
+      reasons: [`SBP ${sbp_early} mmHg < 90 — PHYSIOLOGY HARD OVERRIDE`],
+      sources: ['VITAL', 'BTF 2016', 'IMPACT'],
+      summary: 'Qaror asosi: PHYSIOLOGY HARD OVERRIDE (Kritik gipotenziya)',
+      decisionLayer: 'VITAL (SBP kritik)',
+      breakdown: {
+        cchr:    { score: 0, weight: 0.35, contribution: 0, rules: [] },
+        gcs:     { score: 0, weight: 0.30, contribution: 0, rules: [] },
+        btf:     { score: 0, weight: 0.20, contribution: 0, rules: [] },
+        nice:    { score: 0, weight: 0.10, contribution: 0, rules: [] },
+        alcohol: { score: 0, weight: 0.05, contribution: 0, rules: [] },
+        vital:   { score: 90, weight: 0, contribution: 90, rules: [earlyRule] },
+      },
+      treatmentTactics: [
+        `KRITIK: SBP ${sbp_early} mmHg — MAP ≥80 mmHg tiklash zarur: suyuqlik va vazopresorlar baholansin (BTF 2016/2023)`,
+        'Neyrojarroh DARHOL chaqirilsin',
+        'Shoshilinch KT bajarilsin (agar bajarilmagan)',
+        'ICP oshishi bo\'lsa — IV mannitol yuborilsin (1 g/kg, BTF 2016)',
+        'Bosh 30 daraja ko\'tarilgan holda ushlab turilsin',
+        'GCS har 15 daqiqada baholansin',
+      ],
+      surgicalUrgency: 'emergency', hematomaSurgery: null,
+      pubmedQuery: 'hypotension traumatic brain injury secondary insult outcome',
+      pubmedQueries: ['hypotension traumatic brain injury secondary insult outcome'],
+      disclaimer: "Bu tizim klinik qaror qabul qilishni qo'llab-quvvatlash uchun mo'ljallangan. Yakuniy qaror doimo shifokorga tegishli.",
+      patientInfo: { age: input.age, sex: input.sex === 'male' ? 'Erkak' : 'Ayol', traumaMechanism: input.traumaMechanism, ctFindings: input.ctFindings ?? [] },
+      analyzedAt: new Date().toISOString(),
+    };
+  }
 
-    // K_V4: Kritik gipoksiya (SpO2 < 90%) — EPIC Study 2021
-    // Bitta desaturatsiya epizodi: OR o'lim 3.86
-    if (hasSpO2 && spO2 < 90) {
-      vitalScore    = Math.max(vitalScore, 90);
-      vitalOverride = vitalOverride ?? 'urgent';
-      surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
-      vitalRules.push({
-        id: 'VIT-HYP1', name: 'Kritik gipoksiya',
-        protocol: 'VITAL', riskLevel: 'high',
-        description: `SpO2 ${spO2}% < 90% — KRITIK ikkilamchi TBI jarohati. OR o'lim 3.86 (EPIC Study 2021)`,
-        weight: 0.90
-      });
-      xaiEntries.push({
-        fact:   `SpO2 = ${spO2}% (chegara: 90%)`,
+  // ── P2 FIX: ALOHIDA KRITIK SpO2 < 90% (SBP normal yoki kiritilmagan) ──
+  // EPIC Study 2021: yolg'iz gipoksiya OR o'lim 3.86 — early return zarur
+  if (hasSpO2_early && spO2_early < 90 && !(hasSBP_early && sbp_early < 90)) {
+    let earlySeverity: Severity;
+    if      (gcsTotal >= 13) earlySeverity = 'mild';
+    else if (gcsTotal >= 9)  earlySeverity = 'moderate';
+    else if (gcsTotal >= 6)  earlySeverity = 'severe';
+    else                     earlySeverity = 'critical';
+    const earlyRule: TriggeredRule = {
+      id: 'VIT-HYP1', name: 'Kritik gipoksiya — HARD OVERRIDE',
+      protocol: 'VITAL', riskLevel: 'high',
+      description: `SpO2 ${spO2_early}% < 90% — KRITIK ikkilamchi TBI jarohati. OR o'lim 3.86 (EPIC Study 2021)`,
+      weight: 0.90
+    };
+    return {
+      decision: 'SURGICAL_EVALUATION', urgency: 'EMERGENCY',
+      confidence: 0.92, confidencePenalties: !hasSBP_early ? ["SBP kiritilmagan (−8%)"] : [],
+      score: 90, severity: earlySeverity, gcsTotal,
+      rtsScore: undefined, hasPolytrauma: false, polytravmaZones: [],
+      xaiEntries: [{
+        fact:   `SpO2 = ${spO2_early}% (chegara: 90%)`,
         effect: 'Gipoksiya → miya kislorod etishmovchiligi → neyronlar zararlanishi',
         impact: `Bitta epizod OR o'lim 3.86. Maqsad SpO2 >= 94% (BTF 2023)`,
         source: 'EPIC Study 2021, BTF 2023, ENLS 6.0'
-      });
-    }
-    // K_V5: Gipoksiya xavf zonasi (SpO2 90–94%)
-    else if (hasSpO2 && spO2 < 94) {
-      vitalScore = Math.max(vitalScore, 40);
-      vitalRules.push({
-        id: 'VIT-HYP2', name: 'Gipoksiya xavf zonasi',
-        protocol: 'VITAL', riskLevel: 'medium',
-        description: `SpO2 ${spO2}% — xavf zonasi (90–94%). Maqsad >= 94% (BTF 2023). O2 terapiya boshlansin`,
-        weight: 0.40
-      });
-    }
+      }],
+      reasons: [`SpO2 ${spO2_early}% < 90% — PHYSIOLOGY HARD OVERRIDE`],
+      sources: ['VITAL', 'EPIC Study 2021', 'BTF 2023'],
+      summary: 'Qaror asosi: PHYSIOLOGY HARD OVERRIDE (Kritik gipoksiya)',
+      decisionLayer: 'VITAL (SpO2 kritik)',
+      breakdown: {
+        cchr:    { score: 0, weight: 0.35, contribution: 0, rules: [] },
+        gcs:     { score: 0, weight: 0.30, contribution: 0, rules: [] },
+        btf:     { score: 0, weight: 0.20, contribution: 0, rules: [] },
+        nice:    { score: 0, weight: 0.10, contribution: 0, rules: [] },
+        alcohol: { score: 0, weight: 0.05, contribution: 0, rules: [] },
+        vital:   { score: 90, weight: 0, contribution: 90, rules: [earlyRule] },
+      },
+      treatmentTactics: [
+        `KRITIK: SpO2 ${spO2_early}% — yuqori oqimli O2 yoki intubatsiya DARHOL baholansin. Maqsad SpO2 ≥94% (BTF 2023)`,
+        'Neyrojarroh DARHOL chaqirilsin',
+        'Shoshilinch KT bajarilsin (agar bajarilmagan)',
+        'Bosh 30 daraja ko\'tarilgan holda ushlab turilsin',
+        'GCS har 15 daqiqada baholansin',
+      ],
+      surgicalUrgency: 'emergency', hematomaSurgery: null,
+      pubmedQuery: 'hypoxia traumatic brain injury secondary brain injury',
+      pubmedQueries: ['hypoxia traumatic brain injury secondary brain injury'],
+      disclaimer: "Bu tizim klinik qaror qabul qilishni qo'llab-quvvatlash uchun mo'ljallangan. Yakuniy qaror doimo shifokorga tegishli.",
+      patientInfo: { age: input.age, sex: input.sex === 'male' ? 'Erkak' : 'Ayol', traumaMechanism: input.traumaMechanism, ctFindings: input.ctFindings ?? [] },
+      analyzedAt: new Date().toISOString(),
+    };
   }
+  // ════════════════════════════════════════════════════════════════════
+  const physResult = assessPhysiology({
+    sbp:             input.sbp,
+    spO2:            input.spO2,
+    respiratoryRate: input.respiratoryRate,
+    gcsTotal,
+    hasSBP,
+    hasSpO2,
+    hasRR,
+    chestPain:       input.complaints?.chestPain,
+    abdominalPain:   input.complaints?.abdominalPain,
+  });
 
-  // K_V6: Ko'krak og'rig'i + SpO2 < 94% → airway priority (WSES 2019)
-  if (input.complaints?.chestPain && hasSpO2 && spO2 < 94) {
-    vitalScore = Math.max(vitalScore, 75);
-    vitalOverride = vitalOverride ?? 'urgent';
-    vitalRules.push({
-      id: 'VIT-THOR', name: "Ko'krak + gipoksiya",
-      protocol: 'WSES', riskLevel: 'high',
-      description: `Ko'krak og'rig'i + SpO2 ${spO2}% — Airway priority. Ko'krak jarohati TBI DAN OLDIN davolansin (WSES 2019)`,
-      weight: 0.75
-    });
-    xaiEntries.push({
-      fact:   `Ko'krak og'rig'i + SpO2 = ${spO2}%`,
-      effect: "Ko'krak jarohati (pnevmotoraks?) → gipoksiya → ikkilamchi TBI",
-      impact: "cABCDE: Airway/Breathing birinchi. Ko'krak trubkasi ko'rsatmasi bo'lishi mumkin",
-      source: 'WSES 2019, ATLS 10th Ed.'
-    });
-  }
+  const vitalRules    = physResult.vitalRules;
+  const vitalScore    = physResult.vitalScore;
+  const vitalOverride = physResult.vitalOverride;
+  const rtsScore      = physResult.rtsScore;
+  let surgicalUrgency: AnalysisResult['surgicalUrgency'] = physResult.surgicalUrgencyDelta;
 
-  // K_V7: Qorin og'rig'i + SBP < 90 → qorin qon ketishi + TBI (WSES 2020)
-  if (input.complaints?.abdominalPain && hasSBP && sbp < 90) {
-    vitalScore = Math.max(vitalScore, 85);
-    vitalOverride = vitalOverride ?? 'urgent';
-    surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
-    vitalRules.push({
-      id: 'VIT-ABD', name: 'Qorin + gipotenziya',
-      protocol: 'WSES', riskLevel: 'high',
-      description: `Qorin og'rig'i + SBP ${sbp} mmHg < 90 — qorin ichki qon ketishi + TBI. Ikkala jarroh darhol chaqirilsin (WSES 2020)`,
-      weight: 0.85
-    });
-    xaiEntries.push({
-      fact:   `Qorin og'rig'i + SBP = ${sbp} mmHg`,
-      effect: 'Qorin jarohati (jigar/taloq?) → gipotenziya → TBI ikkilamchi zararlanishi',
-      impact: 'FAST tekshiruvi zarur. Umumiy jarroh + neyrojarroh birgalikda maslahat zarur',
-      source: 'WSES 2020, CRASH model, ACS TQIP 2023'
-    });
-  }
-
-  // K_V8: Anormal nafas tezligi (RTS component) — Boyd 1987
-  if (hasRR && (rr < 10 || rr > 29)) {
-    vitalScore = Math.max(vitalScore, 65);
-    const rrStatus = rr < 10 ? `${rr} — bradipnoe` : `${rr} — taxipnoe`;
-    vitalRules.push({
-      id: 'VIT-RR', name: 'Anormal nafas',
-      protocol: 'VITAL', riskLevel: 'high',
-      description: `Nafas tezligi ${rrStatus}. RTS pasaygan — ko'krak/CNS jarohati (RTS Boyd 1987)`,
-      weight: 0.65
-    });
-  }
-
-  // RTS hisoblash (faqat SBP va RR bo'lsa)
-  let rtsScore: number | undefined;
-  if (hasSBP && hasRR) {
-    rtsScore = Math.round(
-      (0.9368 * rtsCode_GCS(gcsTotal) +
-       0.7326 * rtsCode_SBP(sbp) +
-       0.2908 * rtsCode_RR(rr)) * 100
-    ) / 100;
-    if (rtsScore < 5) {
-      // RTS < 5 → klinik og'ir holat, urgency oshiriladi
-      vitalScore = Math.max(vitalScore, 70);
-      vitalOverride = vitalOverride ?? 'urgent';
-      surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
-      xaiEntries.push({
-        fact:   `RTS = ${rtsScore} (norma: 7.84)`,
-        effect: "Past RTS → og'ir qo'shimcha jarohat va fiziologik beqarorlik belgisi",
-        impact: `Travma markazi aktivatsiyasi ko'rsatmasi (Boyd 1987). Mortality xavfi sezilarli oshgan.`,
-        source: 'RTS Boyd 1987, TRISS'
-      });
-    } else if (rtsScore < 7) {
-      xaiEntries.push({
-        fact:   `RTS = ${rtsScore} (norma: 7.84)`,
-        effect: "O'rtacha pasaygan RTS — fiziologik zaxira kamaygan",
-        impact: "Yaqin monitoring zarur. Yomonlashish belgisi sifatida kuzating.",
-        source: 'RTS Boyd 1987, TRISS'
-      });
-    }
-  }
+  // physiology.ts dan kelgan XAI yozuvlarini asosiy ro'yxatga qo'shamiz
+  xaiEntries.push(...physResult.xaiEntries);
 
   // ════════════════════════════════════════════════════════════════════
-  // QATLAM 2: NEURO (GCS + Ko'z qorachig'i)
+  // QATLAM 2: NEURO — modules/neuro.ts dan (P1 FIX: modul ishlatiladi)
   // ════════════════════════════════════════════════════════════════════
-  const gcsRules: TriggeredRule[] = [];
-  let   gcsScore = 0;
+  const neuroResult = assessNeuro({
+    gcsTotal,
+    eyeScore:    input.gcs.eye,
+    verbalScore: input.gcs.verbal,
+    motorScore:  input.gcs.motor,
+  });
 
-  if      (gcsTotal <= 5)  {
-    gcsScore = 100;
-    gcsRules.push({ id: 'GCS-1', name: 'Kritik TBI',  protocol: 'GCS', riskLevel: 'high',
-      description: `GCS ${gcsTotal} — kritik holat (3–5)`, weight: 1.0 });
-  } else if (gcsTotal <= 8)  {
-    gcsScore = 85;
-    gcsRules.push({ id: 'GCS-2', name: "Og'ir TBI",  protocol: 'GCS', riskLevel: 'high',
-      description: `GCS ${gcsTotal} — og'ir TBI (6–8)`, weight: 0.85 });
-  } else if (gcsTotal <= 12) {
-    gcsScore = 60;  // 50 → 60: NICE CG176 GCS<13 = darhol CT, bu "medium" emas
-    gcsRules.push({ id: 'GCS-3', name: "O'rta TBI",  protocol: 'GCS', riskLevel: 'high',
-      description: `GCS ${gcsTotal} — o'rta og'irlikdagi TBI (9–12). NICE CG176: <13 = darhol CT ko'rsatmasi`, weight: 0.60 });
-  } else if (gcsTotal <= 14) {
-    gcsScore = 20;
-    gcsRules.push({ id: 'GCS-4', name: 'Yengil TBI', protocol: 'GCS', riskLevel: 'medium',
-      description: `GCS ${gcsTotal} — yengil TBI (13–14)`, weight: 0.20 });
-  }
+  const gcsRules = neuroResult.gcsRules;
+  const gcsScore = neuroResult.gcsScore;
+
+  // neuro.ts dan kelgan XAI yozuvlarini asosiy ro'yxatga qo'shamiz
+  xaiEntries.push(...neuroResult.xaiEntries);
 
   // ════════════════════════════════════════════════════════════════════
   // QATLAM 3: KT (BTF protokoli — gematoma, siljish)
@@ -532,19 +448,20 @@ export function analyze(
       source: "BTF 2016, ACS TQIP 2023"
     });
 
-    // FIX 2A: Kontuziya o'lchami bo'yicha qo'shimcha gradatsiya
+    // FIX 2A + P3 FIX: Kontuziya o'lchami — contusionVolume alohida field (hematomaVolume bilan aralashmaslik uchun)
     // Katta kontuziya (>20ml) → jarrohlik baholash (BTF 2016)
-    if (input.hematomaVolume !== undefined && input.hematomaVolume >= 20 && !hasHematoma) {
+    const contVol = input.contusionVolume;
+    if (contVol !== undefined && contVol >= 20 && !hasHematoma) {
       btfScore = Math.max(btfScore, 80);
       hematomaSurgery = 'surgery_required';
       surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
       btfRules.push({
         id: 'BTF-CONT-VOL', name: 'Kontuziya ≥ 20ml', protocol: 'BTF', riskLevel: 'high',
-        description: `Miya kontuziyasi ≥ 20ml (${input.hematomaVolume}ml) — jarrohlik baholash zarur (BTF 2016)`,
+        description: `Miya kontuziyasi ≥ 20ml (${contVol}ml) — jarrohlik baholash zarur (BTF 2016)`,
         weight: 0.80
       });
       xaiEntries.push({
-        fact:   `Kontuziya hajmi: ${input.hematomaVolume}ml`,
+        fact:   `Kontuziya hajmi: ${contVol}ml`,
         effect: "Katta kontuziya → ICP oshishi va mass effect xavfi yuqori",
         impact: "BTF 2016: katta kontuziya (≥20ml) jarrohlik ko'rsatmasi bo'lishi mumkin — neyrojarroh DARHOL chaqirilsin",
         source: "BTF 2016, ACS TQIP 2023"
@@ -1298,40 +1215,10 @@ export function analyze(
     treatmentTactics.push("Immunosupressiya: infeksiya ehtimoli yuqori — isitma bo'lsa LP zarur");
 
   // ════════════════════════════════════════════════════════════════════
-  // XAI KENGAYTIRISH — GCS, CCHR, BTF, NICE, Alkogol, Yosh
-  // Vital signs XAI yuqorida qatlam 1 da allaqachon qo'shilgan
+  // XAI KENGAYTIRISH — CCHR, BTF, NICE, Alkogol, Yosh
+  // GCS XAI: modules/neuro.ts dan assessNeuro() orqali allaqachon qo'shilgan
+  // Vital signs XAI: modules/physiology.ts dan allaqachon qo'shilgan
   // ════════════════════════════════════════════════════════════════════
-
-  // GCS
-  if (gcsTotal <= 5) {
-    xaiEntries.push({
-      fact:   `GCS jami: ${gcsTotal} (E${input.gcs.eye}+V${input.gcs.verbal}+M${input.gcs.motor})`,
-      effect: "Kritik darajadagi ong buzilishi — beyin o'zagi funksiyasi xavf ostida",
-      impact: "GCS ≤5 = kritik holat. BTF 2016: GCS ≤8 neyrojarroh maslahat zarur. Tezkor baholash zarur",
-      source: 'Teasdale & Jennett 1974, BTF 4th Ed. 2016'
-    });
-  } else if (gcsTotal <= 8) {
-    xaiEntries.push({
-      fact:   `GCS jami: ${gcsTotal} (E${input.gcs.eye}+V${input.gcs.verbal}+M${input.gcs.motor})`,
-      effect: "Og'ir TBI — himoya reflekslari buzilishi, aspiratsiya va ikkilamchi miya jarohati ehtimoli oshadi",
-      impact: "BTF 2016: GCS ≤8 = intubatsiya chegarasi. Shoshilinch KT va neyrojarroh maslahat zarur. IMPACT model: OR o'lim 3.2x",
-      source: 'BTF 4th Ed. 2016, IMPACT model, ACS TQIP 2023'
-    });
-  } else if (gcsTotal <= 12) {
-    xaiEntries.push({
-      fact:   `GCS jami: ${gcsTotal} (E${input.gcs.eye}+V${input.gcs.verbal}+M${input.gcs.motor})`,
-      effect: "O'rta og'irlikdagi TBI — nevrologik yomonlashish ehtimoli mavjud",
-      impact: "NICE CG176: GCS <13 = KT zarur. Dinamik kuzatish va neyrojarroh maslahat zarur",
-      source: 'NICE CG176 2023, BTF 2016, CCHR Lancet 2001'
-    });
-  } else if (gcsTotal <= 14) {
-    xaiEntries.push({
-      fact:   `GCS jami: ${gcsTotal} (E${input.gcs.eye}+V${input.gcs.verbal}+M${input.gcs.motor})`,
-      effect: 'Yengil TBI — GCS 13–14 CCHR yuqori xavf zonasida',
-      impact: "CCHR (Stiell 2001): GCS <15 jarohatdan 2 soat o'tgach = yuqori xavf mezoni. Kuzatish zarur",
-      source: 'CCHR Lancet 2001, NICE CG176 2023'
-    });
-  }
 
   // CCHR
   if (cchrScore >= 35) {

@@ -61,6 +61,7 @@ export interface ClinicalInput {
   hematomaVolume?: number;
   hematomaThickness?: number;
   midlineShift?: number;
+  contusionVolume?: number;          // Miya kontuziyasi hajmi (ml) — hematomaVolume dan alohida
 
   diabetes: boolean;
   hypertensionHistory: boolean;
