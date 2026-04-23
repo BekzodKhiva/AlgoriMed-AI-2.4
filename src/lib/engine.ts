@@ -59,10 +59,18 @@ function rtsCode_RR(rr: number): number {
 const URGENCY_RANK: Record<string, number> = {
   'not_required': 0, 'monitor': 1, 'urgent': 2, 'emergency': 3
 };
+// confidence: 'high' = BTF/VITAL dan — directan o'lchanadigan klinik topilma
+//             'medium' = CCHR/NICE dan — xavf omili, topilma emas
+// Faqat 'high' confidence trigger 'emergency' ga override qila oladi
 function worstSurgical(
   a: AnalysisResult['surgicalUrgency'],
-  b: AnalysisResult['surgicalUrgency']
+  b: AnalysisResult['surgicalUrgency'],
+  triggerConfidence: 'high' | 'medium' = 'high'
 ): AnalysisResult['surgicalUrgency'] {
+  // Medium confidence trigger faqat 'urgent' gacha chiqishi mumkin, 'emergency' ga emas
+  if (triggerConfidence === 'medium' && b === 'emergency') {
+    b = 'urgent';
+  }
   return URGENCY_RANK[a] >= URGENCY_RANK[b] ? a : b;
 }
 
@@ -263,10 +271,21 @@ export function analyze(
        0.2908 * rtsCode_RR(rr)) * 100
     ) / 100;
     if (rtsScore < 5) {
+      // RTS < 5 → klinik og'ir holat, urgency oshiriladi
+      vitalScore = Math.max(vitalScore, 70);
+      vitalOverride = vitalOverride ?? 'urgent';
+      surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
       xaiEntries.push({
         fact:   `RTS = ${rtsScore} (norma: 7.84)`,
-        effect: "Past RTS → og'ir qo'shimcha jarohat belgisi",
-        impact: 'Travma markazi aktivatsiyasi ko\'rsatmasi (Boyd 1987)',
+        effect: "Past RTS → og'ir qo'shimcha jarohat va fiziologik beqarorlik belgisi",
+        impact: `Travma markazi aktivatsiyasi ko'rsatmasi (Boyd 1987). Mortality xavfi sezilarli oshgan.`,
+        source: 'RTS Boyd 1987, TRISS'
+      });
+    } else if (rtsScore < 7) {
+      xaiEntries.push({
+        fact:   `RTS = ${rtsScore} (norma: 7.84)`,
+        effect: "O'rtacha pasaygan RTS — fiziologik zaxira kamaygan",
+        impact: "Yaqin monitoring tavsiya etiladi. Yomonlashish belgisi sifatida kuzating.",
         source: 'RTS Boyd 1987, TRISS'
       });
     }
@@ -287,9 +306,9 @@ export function analyze(
     gcsRules.push({ id: 'GCS-2', name: "Og'ir TBI",  protocol: 'GCS', riskLevel: 'high',
       description: `GCS ${gcsTotal} — og'ir TBI (6–8)`, weight: 0.85 });
   } else if (gcsTotal <= 12) {
-    gcsScore = 50;
+    gcsScore = 60;  // 50 → 60: NICE CG176 GCS<13 = darhol CT, bu "medium" emas
     gcsRules.push({ id: 'GCS-3', name: "O'rta TBI",  protocol: 'GCS', riskLevel: 'medium',
-      description: `GCS ${gcsTotal} — o'rta og'irlikdagi TBI (9–12)`, weight: 0.50 });
+      description: `GCS ${gcsTotal} — o'rta og'irlikdagi TBI (9–12). NICE CG176: <13 = darhol CT ko'rsatmasi`, weight: 0.60 });
   } else if (gcsTotal <= 14) {
     gcsScore = 20;
     gcsRules.push({ id: 'GCS-4', name: 'Yengil TBI', protocol: 'GCS', riskLevel: 'medium',
@@ -585,7 +604,10 @@ export function analyze(
   }
   if (input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness) {
     niceScore += 30;
-    niceRules.push({ id: 'NICE-2', name: 'NICE Meningeal', protocol: 'NICE', riskLevel: 'high', description: "Meningeal belgilar — meningit / SAQ ehtimolini istisno qilish tavsiya etiladi (NICE CG176)", weight: 0.30 });
+    niceRules.push({ id: 'NICE-2', name: 'NICE Meningeal', protocol: 'NICE', riskLevel: 'high',
+      // LP faqat CT normal bo'lsa ko'rsatiladi — bu note overrideReasons da chiqadi
+      description: "Meningeal belgilar — avval KT zarur (ICP istisno qilish), keyin LP ko'rib chiqilsin (NICE CG176)",
+      weight: 0.30 });
   }
   if (input.sex === 'female' && input.pregnancy) {
     niceScore += 20;
@@ -661,17 +683,32 @@ export function analyze(
     hierarchyOverride = 'urgent';
   }
 
+  // K_GCS13: GCS < 13 — NICE CG176 to'g'ridan-to'g'ri CT qaror beruvchi (decision maker)
+  // NICE CG176 2023: GCS <13 = immediate CT. Bu protokol "support" emas, "decision" qatlami.
+  if (gcsTotal < 13 && hierarchyOverride === null) {
+    hierarchyOverride = 'urgent';
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+    overrideReasons.push(`GCS ${gcsTotal} < 13 — NICE CG176: darhol CT tavsiya etiladi`);
+  }
+
   // K4: Antikoagulyant + har qanday TBI (Cohen 2006, EFNS)
   if (input.anticoagulant && hierarchyOverride === null) {
     hierarchyOverride = 'ct_mandatory';
     overrideReasons.push("Antikoagulyant + TBI → CT tavsiya etiladi (Cohen 2006)");
   }
 
-  // K17: GCS <= 8 (BTF 2016)
-  if (gcsTotal <= 8 && hierarchyOverride === null) {
+  // K4b: Antikoagulyant + GCS < 15 → urgent (Cohen 2006 + EFNS)
+  if (input.anticoagulant && gcsTotal < 15 && hierarchyOverride !== 'emergency' && hierarchyOverride !== 'urgent') {
     hierarchyOverride = 'urgent';
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
-    overrideReasons.push(`GCS ${gcsTotal} <= 8 — og'ir TBI, shoshilinch CT tavsiya etiladi`);
+    overrideReasons.push(`Antikoagulyant + GCS ${gcsTotal} < 15 — shoshilinch CT tavsiya etiladi (Cohen 2006, EFNS)`);
+  }
+
+  // K17: GCS <= 8 (BTF 2016)
+  if (gcsTotal <= 8 && (hierarchyOverride === null || hierarchyOverride === 'ct_mandatory')) {
+    hierarchyOverride = 'urgent';
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+    overrideReasons.push(`GCS ${gcsTotal} <= 8 — og'ir TBI, darhol CT va neyrojarroh maslahat tavsiya etiladi`);
   }
 
   // K12: 65+ yosh + antikoagulyant (NICE 2023)
@@ -754,7 +791,19 @@ export function analyze(
 
   const cchrGcsCorr = (cchrScore > 50 && gcsScore > 50) ? 5 : 0;
   const btfGcsCorr  = (btfScore  > 70 && gcsScore > 70) ? 5 : 0;
-  const score = Math.min(100, Math.round(rawScore + cchrGcsCorr + btfGcsCorr));
+
+  // Minimum score floor — klinik jihatdan muhim kombinatsiyalar uchun
+  // GCS < 13 yoki antikoagulyant + har qanday xavf → kamida 45
+  const gcs13Floor        = gcsTotal < 13 ? 45 : 0;
+  // Antikoagulyant + GCS < 15 → kamida 40
+  const anticoagGcsFloor  = (input.anticoagulant && gcsTotal < 15) ? 40 : 0;
+  // Xavfli mexanizm + GCS < 13 → kamida 50
+  const mechGcsFloor      = ((input.traumaMechanism === 'fall_height' || input.traumaMechanism === 'road_accident') && gcsTotal < 13) ? 50 : 0;
+  // GCS < 13 + antikoagulyant + xavfli mexanizm → kamida 65 (BTF high risk combination)
+  const tripleComboFloor  = (gcsTotal < 13 && input.anticoagulant && (input.traumaMechanism === 'fall_height' || input.traumaMechanism === 'road_accident')) ? 65 : 0;
+
+  const minFloor = Math.max(gcs13Floor, anticoagGcsFloor, mechGcsFloor, tripleComboFloor);
+  const score = Math.min(100, Math.max(minFloor, Math.round(rawScore + cchrGcsCorr + btfGcsCorr)));
 
   // ════════════════════════════════════════════════════════════════════
   // CONFIDENCE — penalty tizimi bilan (hujjat tavsiyasi)
@@ -799,12 +848,21 @@ export function analyze(
   // ════════════════════════════════════════════════════════════════════
   let decision: Decision;
 
+  // KT qilinmagan holda hematomaSurgery null bo'lishi kerak
+  // Chunki KT natijasisiz jarrohlik ko'rsatmasini aniqlash mumkin emas
+  if (!ctDone && hematomaSurgery !== null) {
+    hematomaSurgery = null;
+  }
+
   // Mutlaq favqulodda
   if (hierarchyOverride === 'emergency' || surgicalUrgency === 'emergency') {
     decision = 'SURGICAL_EVALUATION';
   } else if (ctDone) {
-    if (surgicalUrgency === 'urgent' || surgicalUrgency === 'monitor') {
+    if (surgicalUrgency === 'urgent') {
       decision = 'SURGICAL_EVALUATION';
+    } else if (surgicalUrgency === 'monitor') {
+      // Monitor = takroriy CT, neyrojarroh maslahat — SURGICAL_EVALUATION emas
+      decision = 'CT_REQUIRED';
     } else if (hierarchyOverride === 'urgent' || hierarchyOverride === 'ct_mandatory') {
       decision = 'CT_REQUIRED';
     } else if (score >= 35) {
@@ -831,7 +889,7 @@ export function analyze(
   // Urgency — worst wins to'liq amalga oshirilgan
   let urgency: Urgency;
   if      (hierarchyOverride === 'emergency' || surgicalUrgency === 'emergency') urgency = 'EMERGENCY';
-  else if (hierarchyOverride === 'urgent'    || surgicalUrgency === 'urgent' || score >= 70) urgency = 'HIGH';
+  else if (hierarchyOverride === 'urgent'    || surgicalUrgency === 'urgent' || score >= 65) urgency = 'HIGH';
   else if (hierarchyOverride === 'ct_mandatory' || surgicalUrgency === 'monitor' || score >= 35) urgency = 'MODERATE';
   else urgency = 'LOW';
 
@@ -1145,7 +1203,14 @@ export function analyze(
   // REASONS VA SOURCES
   // ════════════════════════════════════════════════════════════════════
   const allRules = [...gcsRules, ...cchrRules, ...btfRules, ...niceRules, ...alcoholRules, ...vitalRules];
-  const ruleReasons = [...new Set(allRules.map(r => r.description))];
+  // Deduplication by rule ID — bir xil ID ikki marta ko'rinmasin
+  const seenIds = new Set<string>();
+  const dedupedRules = allRules.filter(r => {
+    if (seenIds.has(r.id)) return false;
+    seenIds.add(r.id);
+    return true;
+  });
+  const ruleReasons = [...new Set(dedupedRules.map(r => r.description))];
   const allReasons  = [...new Set([...overrideReasons, ...ruleReasons])].slice(0, 10);
 
   const sources = new Set<string>();
@@ -1170,6 +1235,32 @@ export function analyze(
     other:         input.otherMechanismLabel ? `Boshqa: ${input.otherMechanismLabel}` : 'Boshqa',
   };
 
+  // Qaror qaysi qatlamdan keldi — shifokorga tushuntirish uchun
+  let decisionLayer: string;
+  if (hierarchyOverride === 'emergency' || surgicalUrgency === 'emergency') {
+    decisionLayer = vitalOverride === 'emergency'
+      ? 'VITAL (SBP/SpO2 kritik)'
+      : 'NEURO (anizokoria / CN III / GCS kritik)';
+  } else if (hierarchyOverride === 'urgent') {
+    if (vitalOverride === 'urgent') decisionLayer = 'VITAL (SBP/SpO2)';
+    else if (gcsTotal < 13)        decisionLayer = 'NEURO (GCS < 13)';
+    else if (gcsTotal <= 8)        decisionLayer = 'NEURO (GCS ≤ 8)';
+    else if (input.anticoagulant)  decisionLayer = 'PROTOKOL (Antikoagulyant + GCS < 15)';
+    else                           decisionLayer = 'PROTOKOL (kombinatsiya)';
+  } else if (hierarchyOverride === 'ct_mandatory') {
+    if (input.anticoagulant)       decisionLayer = 'PROTOKOL (Antikoagulyant)';
+    else if (comorbidities.includes('coagulopathy')) decisionLayer = 'PROTOKOL (Koagulopatiya)';
+    else                           decisionLayer = 'PROTOKOL';
+  } else if (btfScore >= 50) {
+    decisionLayer = 'CT natijasi (BTF protokoli)';
+  } else if (cchrScore >= 35) {
+    decisionLayer = 'CCHR yuqori xavf';
+  } else if (score >= 35) {
+    decisionLayer = 'Weighted score (CCHR+GCS+BTF+NICE)';
+  } else {
+    decisionLayer = 'PROTOKOL (past xavf)';
+  }
+
   return {
     decision, urgency, confidence, confidencePenalties, score, severity,
     gcsTotal, rtsScore, hasPolytrauma, polytravmaZones,
@@ -1177,6 +1268,7 @@ export function analyze(
     reasons: allReasons,
     sources: [...sources],
     summary: `Qaror asosi: ${[...sources].join(', ')}`,
+    decisionLayer,
     breakdown: {
       cchr:    { score: cchrScore,    weight: WEIGHTS.cchr,    contribution: Math.round(cchrScore    * WEIGHTS.cchr),    rules: cchrRules },
       gcs:     { score: gcsScore,     weight: WEIGHTS.gcs,     contribution: Math.round(gcsScore     * WEIGHTS.gcs),     rules: gcsRules },

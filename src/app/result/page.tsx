@@ -10,10 +10,10 @@ interface PubMedArticle { pmid: string; title: string; authors: string; journal:
 
 const DECISION_UZ: Record<string, string> = {
   NO_CT_REQUIRED:      'KT TALAB ETILMAYDI',
-  CT_RECOMMENDED:      'KT TAVSIYA ETILADI',
-  CT_REQUIRED:         'KT TAVSIYA ETILADI',
-  IMMEDIATE_CT:        'SHOSHILINCH KT TAVSIYA ETILADI',
-  SURGICAL_EVALUATION: 'JARROHLIK BAHOLASH TAVSIYA ETILADI',
+  CT_RECOMMENDED:      'KT KO\'RIB CHIQILSIN',
+  CT_REQUIRED:         'KT ZARUR',
+  IMMEDIATE_CT:        'DARHOL KT TALAB ETILADI',
+  SURGICAL_EVALUATION: 'NEYROJARROH MASLAHAT ZARUR',
 };
 
 const DECISION_UZ_CT_DONE: Record<string, string> = {
@@ -25,17 +25,17 @@ const DECISION_UZ_CT_DONE: Record<string, string> = {
 
 const DECISION_DESC: Record<string, string> = {
   NO_CT_REQUIRED:      "Hozirgi klinik ko'rsatkichlar asosida KT skanini bajarish talab etilmaydi.",
-  CT_RECOMMENDED:      'Ehtiyot chorasi sifatida KT bajarish tavsiya etiladi.',
-  CT_REQUIRED:         "Klinik ko'rsatmalar asosida KT skanini bajarish tavsiya etiladi.",
-  IMMEDIATE_CT:        'Shoshilinch KT bajarish tavsiya etiladi.',
-  SURGICAL_EVALUATION: 'Neyrojarroh bilan maslahat va jarrohlik baholash tavsiya etiladi.',
+  CT_RECOMMENDED:      "Ehtiyot chorasi sifatida KT bajarish ko'rib chiqilishi tavsiya etiladi.",
+  CT_REQUIRED:         "Klinik ko'rsatmalar asosida KT skanini bajarish zarur.",
+  IMMEDIATE_CT:        'KT darhol bajarilishi talab etiladi. Kechiktirish mumkin emas.',
+  SURGICAL_EVALUATION: 'Neyrojarroh bilan maslahat va jarrohlik baholash darhol zarur.',
 };
 
 const DECISION_DESC_CT_DONE: Record<string, string> = {
   NO_CT_REQUIRED:      'KT bajarildi va natija normal. Kuzatish yetarli.',
-  CT_RECOMMENDED:      'KT bajarildi. Dinamik nevrologik kuzatish tavsiya etiladi.',
-  CT_REQUIRED:         'KT bajarildi. Natijaga qarab nevrologik monitoring tavsiya etiladi.',
-  SURGICAL_EVALUATION: 'KT bajarildi. Neyrojarroh bilan maslahat tavsiya etiladi.',
+  CT_RECOMMENDED:      "KT bajarildi. Dinamik nevrologik kuzatish tavsiya etiladi.",
+  CT_REQUIRED:         'KT bajarildi. Nevrologik monitoring zarur.',
+  SURGICAL_EVALUATION: 'KT bajarildi. Neyrojarroh bilan maslahat darhol zarur.',
 };
 
 const URGENCY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -136,7 +136,13 @@ export default function ResultPage() {
         {/* ── Emergency banner ── */}
         {isEmergency && (
           <div className={styles.emergencyBanner} style={{ background: urgency.color }}>
-            {result.urgency === 'EMERGENCY' ? '🚨' : '⚠️'} {urgency.label} — {decisionDesc}
+            {result.urgency === 'EMERGENCY' ? '🚨' : '⚠️'} {urgency.label} — {ctDone ? (DECISION_UZ_CT_DONE[result.decision] ?? DECISION_UZ[result.decision]) : (DECISION_UZ[result.decision] ?? result.decision)}
+          </div>
+        )}
+        {/* MODERATE bilan CT_REQUIRED — bu kombinatsiya ham signal berishi kerak */}
+        {result.urgency === 'MODERATE' && (result.decision === 'CT_REQUIRED' || result.decision === 'IMMEDIATE_CT') && (
+          <div className={styles.emergencyBanner} style={{ background: '#e67e22' }}>
+            ⚠️ {urgency.label} — {ctDone ? (DECISION_UZ_CT_DONE[result.decision] ?? DECISION_UZ[result.decision]) : (DECISION_UZ[result.decision] ?? result.decision)}
           </div>
         )}
 
@@ -150,6 +156,16 @@ export default function ResultPage() {
               {decisionLabel}
             </h1>
             <p className={styles.decisionDesc}>{decisionDesc}</p>
+
+            {/* Qaror qatlami — qaysi klinik asosda qaror qilindi */}
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              marginBottom: 10, padding: '4px 10px', borderRadius: 20,
+              background: 'rgba(15,52,96,0.07)', fontSize: 11, color: 'var(--muted)',
+              fontWeight: 500,
+            }}>
+              🔍 Qaror asosi: <strong style={{ color: urgency.color }}>{(result as any).decisionLayer ?? result.summary}</strong>
+            </div>
 
             <div className={styles.metaRow}>
               {result.patientInfo && (
@@ -199,9 +215,12 @@ export default function ResultPage() {
             </div>
 
             {/* Ishonchlilik + penalty */}
-            <div className={styles.confBox}>
+            <div className={styles.confBox} title="Ishonchlilik: faol protokollar soni, ularning kelishuvi va ma'lumot to'liqligi asosida hisoblanadi (35–82%)">
               <span className={styles.confLabel}>Ishonchlilik</span>
               <span className={styles.confVal}>{Math.round(result.confidence * 100)}%</span>
+              <span style={{ fontSize: 10, color: '#888', display: 'block', marginTop: 2 }}>
+                {result.confidence >= 0.70 ? 'Yuqori (ko\'p protokol kelishdi)' : result.confidence >= 0.55 ? 'O\'rta (ba\'zi ma\'lumot yetishmaydi)' : 'Past (muhim ma\'lumot kiritilmagan)'}
+              </span>
             </div>
             {result.confidencePenalties && result.confidencePenalties.length > 0 && (
               <div style={{

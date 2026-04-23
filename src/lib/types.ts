@@ -126,6 +126,7 @@ export interface AnalysisResult {
   reasons: string[];
   sources: string[];
   summary: string;
+  decisionLayer: string;           // Qaror qaysi qatlamdan keldi: VITAL / NEURO / CT / PROTOCOL
 
   breakdown: {
     gcs:     ProtocolScore;
