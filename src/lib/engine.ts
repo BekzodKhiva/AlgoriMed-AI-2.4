@@ -239,7 +239,7 @@ export function analyze(
     vitalRules.push({
       id: 'VIT-ABD', name: 'Qorin + gipotenziya',
       protocol: 'WSES', riskLevel: 'high',
-      description: `Qorin og'rig'i + SBP ${sbp} mmHg < 90 — qorin ichki qon ketishi + TBI. Ikkala jarroh maslahat tavsiya etiladi (WSES 2020)`,
+      description: `Qorin og'rig'i + SBP ${sbp} mmHg < 90 — qorin ichki qon ketishi + TBI. Ikkala jarroh darhol chaqirilsin (WSES 2020)`,
       weight: 0.85
     });
     xaiEntries.push({
@@ -352,11 +352,11 @@ export function analyze(
       if (gcsTotal >= 9) {
         btfScore = 75; surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
         btfRules.push({ id: 'BTF-H3', name: 'BTF Jarrohlik', protocol: 'BTF', riskLevel: 'high',
-          description: `Gematoma ${vol}ml — neyrojarroh maslahat tavsiya etiladi`, weight: 0.75 });
+          description: `Gematoma ${vol}ml — neyrojarroh maslahat zarur`, weight: 0.75 });
       } else {
         btfScore = 90; surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
         btfRules.push({ id: 'BTF-H3b', name: 'BTF Jarrohlik+GCS', protocol: 'BTF', riskLevel: 'high',
-          description: `Gematoma ${vol}ml + GCS ${gcsTotal} — jarrohlik tavsiya etiladi (BTF 2016)`, weight: 0.90 });
+          description: `Gematoma ${vol}ml + GCS ${gcsTotal} — jarrohlik ko'rsatiladi (BTF 2016)`, weight: 0.90 });
       }
     }
 
@@ -377,7 +377,7 @@ export function analyze(
     surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
     btfRules.push({
       id: 'BTF-CONT', name: 'Miya kontuziyasi', protocol: 'BTF', riskLevel: 'medium',
-      description: "Miya kontuziyasi — 6–12 soatdan keyin KT takrorlash tavsiya etiladi (BTF 2016)",
+      description: "Miya kontuziyasi — 6–12 soatdan keyin KT takrorlansin (BTF 2016)",
       weight: 0.50
     });
     xaiEntries.push({
@@ -393,7 +393,7 @@ export function analyze(
       surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
       btfRules.push({
         id: 'BTF-CONT-GCS', name: 'Kontuziya + GCS ≤ 8', protocol: 'BTF', riskLevel: 'high',
-        description: `Miya kontuziyasi + GCS ${gcsTotal} ≤ 8 — neyrojarroh maslahat tavsiya etiladi (BTF 2016)`,
+        description: `Miya kontuziyasi + GCS ${gcsTotal} ≤ 8 — neyrojarroh maslahat zarur (BTF 2016)`,
         weight: 0.85
       });
     }
@@ -403,7 +403,7 @@ export function analyze(
       surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
       btfRules.push({
         id: 'BTF-CONT-AC', name: 'Kontuziya + Antikoagulyant', protocol: 'BTF', riskLevel: 'high',
-        description: "Miya kontuziyasi + antikoagulyant — kechikkan qon ketish ehtimoli yuqori, reversal terapiya ko'rib chiqilishi tavsiya etiladi (BTF 2016)",
+        description: "Miya kontuziyasi + antikoagulyant — kechikkan qon ketish ehtimoli yuqori, reversal terapiya baholansin (BTF 2016)",
         weight: 0.70
       });
     }
@@ -415,7 +415,7 @@ export function analyze(
     surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
     btfRules.push({
       id: 'BTF-FRAC', name: 'Bosh suyagi sinishi', protocol: 'BTF', riskLevel: 'medium',
-      description: "Bosh suyagi sinishi KT da — neyrojarroh konsultatsiyasi tavsiya etiladi (BTF 2016)",
+      description: "Bosh suyagi sinishi KT da — neyrojarroh konsultatsiyasi zarur (BTF 2016)",
       weight: 0.40
     });
     xaiEntries.push({
@@ -430,7 +430,7 @@ export function analyze(
       surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
       btfRules.push({
         id: 'BTF-FRAC-BASE', name: 'Asos suyagi sinishi', protocol: 'BTF', riskLevel: 'high',
-        description: "Asos suyagi sinishi (Battle belgisi / Raccoon eyes / CSF oqishi) — neyrojarroh maslahat tavsiya etiladi (BTF 2016)",
+        description: "Asos suyagi sinishi (Battle belgisi / Raccoon eyes / CSF oqishi) — neyrojarroh maslahat zarur (BTF 2016)",
         weight: 0.65
       });
     }
@@ -446,7 +446,7 @@ export function analyze(
     hematomaSurgery = 'surgery_required';
     btfRules.push({
       id: 'BTF-MC-HC', name: 'Gematoma + Kontuziya', protocol: 'BTF', riskLevel: 'high',
-      description: "Gematoma + Miya kontuziyasi — ikkilamchi zararlanish ehtimoli yuqori, neyrojarroh maslahat tavsiya etiladi (BTF 2016)",
+      description: "Gematoma + Miya kontuziyasi — ikkilamchi zararlanish ehtimoli yuqori, neyrojarroh maslahat zarur (BTF 2016)",
       weight: 0.85
     });
     xaiEntries.push({
@@ -475,7 +475,7 @@ export function analyze(
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
     btfRules.push({
       id: 'BTF-MC-CF', name: 'Kontuziya + Suyak sinishi', protocol: 'BTF', riskLevel: 'high',
-      description: "Miya kontuziyasi + Suyak sinishi — kombinatsiyalangan jarohat, neyrojarroh maslahat tavsiya etiladi (BTF 2016)",
+      description: "Miya kontuziyasi + Suyak sinishi — kombinatsiyalangan jarohat, neyrojarroh maslahat zarur (BTF 2016)",
       weight: 0.65
     });
   }
@@ -506,7 +506,7 @@ export function analyze(
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
     btfRules.push({
       id: 'BTF-POL-GCS', name: "Qo'shimcha jarohat + GCS≤8", protocol: 'BTF', riskLevel: 'high',
-      description: `Qo'shimcha jarohatlar + GCS ${gcsTotal} ≤ 8 — cABCDE parallel va neyrojarroh maslahat tavsiya etiladi (WSES 2019, BTF 2016)`,
+      description: `Qo'shimcha jarohatlar + GCS ${gcsTotal} ≤ 8 — cABCDE parallel va neyrojarroh maslahat zarur (WSES 2019, BTF 2016)`,
       weight: 0.80
     });
   }
@@ -517,7 +517,7 @@ export function analyze(
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
     btfRules.push({
       id: 'BTF-ALK-HEM', name: "Alkogol + Gematoma", protocol: 'BTF', riskLevel: 'high',
-      description: "Alkogol intoksikatsiyasi + gematoma — GCS ishonchsiz bo'lishi mumkin, haqiqiy holat og'irroq ehtimoli. Neyrojarroh maslahat tavsiya etiladi",
+      description: "Alkogol intoksikatsiyasi + gematoma — GCS ishonchsiz bo'lishi mumkin, haqiqiy holat og'irroq ehtimoli. Neyrojarroh maslahat zarur",
       weight: 0.75
     });
   }
@@ -527,7 +527,7 @@ export function analyze(
     btfScore = Math.max(btfScore, 60);
     btfRules.push({
       id: 'BTF-EPI-SEI', name: "Epilepsiya + Tutqanoq", protocol: 'BTF', riskLevel: 'high',
-      description: "Epilepsiya tarixi + jarohatdan keyin tutqanoq — profilaktik antiepileptik va KT tavsiya etiladi (BTF 2016)",
+      description: "Epilepsiya tarixi + jarohatdan keyin tutqanoq — profilaktik antiepileptik va KT zarur (BTF 2016)",
       weight: 0.60
     });
   }
@@ -538,7 +538,7 @@ export function analyze(
     surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
     btfRules.push({
       id: 'BTF-AGE-HEM', name: "65+ yosh + Gematoma", protocol: 'BTF', riskLevel: 'high',
-      description: "Yosh ≥65 + gematoma — keksa yoshda klinik yomonlashish tez bo'lishi mumkin, neyrojarroh maslahat tavsiya etiladi (BTF 2016)",
+      description: "Yosh ≥65 + gematoma — keksa yoshda klinik yomonlashish tez bo'lishi mumkin, neyrojarroh maslahat zarur (BTF 2016)",
       weight: 0.70
     });
   }
@@ -594,7 +594,7 @@ export function analyze(
     niceScore += 25;
     niceRules.push({
       id: 'NICE-AGE', name: 'Yosh 65+', protocol: 'NICE', riskLevel: 'high',
-      description: "Bemor yoshi 65 va undan katta — NICE CG176 bo'yicha KT tavsiya etiladi",
+      description: "Bemor yoshi 65 va undan katta — NICE CG176: KT zarur",
       weight: 0.25
     });
   }
@@ -650,7 +650,7 @@ export function analyze(
     btfScore = 100;
     surgicalUrgency = worstSurgical(surgicalUrgency, 'emergency');
     btfRules.push({ id: 'BTF-N1', name: 'Anizokoria — FAVQULODDA', protocol: 'BTF', riskLevel: 'high',
-      description: "Ko'z qorachig'i asimmetriyasi — transtentorial herniatsiya ehtimoli. Neyrojarrohlik baholash va shoshilinch KT tavsiya etiladi (BTF 2016)", weight: 1.0 });
+      description: "Ko'z qorachig'i asimmetriyasi — transtentorial herniatsiya ehtimoli. Neyrojarroh DARHOL chaqirilsin, shoshilinch KT bajarilsin (BTF 2016)", weight: 1.0 });
     overrideReasons.push("Anizokoria — transtentorial herniatsiya belgisi");
     xaiEntries.push({
       fact:   `Anizokoria: ${input.anisocoria} tomonda kengaygan qorachiq`,
@@ -666,7 +666,7 @@ export function analyze(
     btfScore = 100;
     surgicalUrgency = worstSurgical(surgicalUrgency, 'emergency');
     btfRules.push({ id: 'BTF-CN3', name: 'CN III Patologik', protocol: 'BTF', riskLevel: 'high',
-      description: "CN III falaji — herniatsiya ehtimoli. Neyrojarrohlik baholash va shoshilinch KT tavsiya etiladi (BTF 2016)", weight: 1.0 });
+      description: "CN III falaji — herniatsiya ehtimoli. Neyrojarroh DARHOL chaqirilsin, shoshilinch KT bajarilsin (BTF 2016)", weight: 1.0 });
     overrideReasons.push("CN III falaji — herniatsiya belgisi");
   }
 
@@ -900,49 +900,61 @@ export function analyze(
   let treatmentTactics: string[] = [];
 
   if (surgicalUrgency === 'emergency') {
+    // FAVQULODDA — protokol bo'yicha aniq ko'rsatma, "tavsiya" yo'q
     treatmentTactics = [
-      "Neyrojarroh bilan shoshilinch maslahat tavsiya etiladi",
-      "Shoshilinch KT (agar bajarilmagan) — KT natijasiga qarab jarrohlik qaror qilinadi",
-      "ICP oshishi gumon qilinsa — IV mannitol ko'rib chiqish mumkin (1 g/kg)",
-      "Bosh 30 daraja ko'tarilgan holda ushlab turish ko'rib chiqilsin",
-      "GCS har 15 daqiqada baholanishi tavsiya etiladi",
-      "MAP 80 mmHg va undan yuqori ushlab turish maqsadi ko'rib chiqilsin",
-      "Bemor NPO (bo'sh qorin) holatida saqlash tavsiya etiladi",
+      "Neyrojarroh DARHOL chaqirilsin",
+      "Shoshilinch KT bajarilsin (agar bajarilmagan) — natijaga qarab jarrohlik hal qilinadi",
+      "ICP oshishi bo'lsa — IV mannitol yuborilsin (1 g/kg, BTF 2016)",
+      "Bosh 30 daraja ko'tarilgan holda ushlab turilsin",
+      "GCS har 15 daqiqada baholansin",
+      "MAP 80 mmHg va undan yuqori ushlab turilsin",
+      "Bemor NPO (bo'sh qorin) holatida saqlash zarur",
     ];
   } else if (surgicalUrgency === 'urgent') {
+    // SHOSHILINCH — aniq ko'rsatma
     treatmentTactics = [
-      "Neyrojarroh bilan shoshilinch maslahat tavsiya etiladi",
-      "Neyrojarrohlik bo'limiga yotqizish tavsiya etiladi",
-      "6-12 soatdan keyin KT takrorlash tavsiya etiladi",
-      "Har soatda nevrologik monitoring tavsiya etiladi",
-      "Bemor NPO holatida saqlash tavsiya etiladi",
+      "Neyrojarroh bilan shoshilinch maslahat o'tkazilsin",
+      "Neyrojarrohlik bo'limiga yotqizish zarur",
+      "6–12 soatdan keyin KT takrorlansin",
+      "Har soatda nevrologik monitoring o'tkazilsin",
+      "Bemor NPO holatida saqlash zarur",
     ];
   } else if (surgicalUrgency === 'monitor') {
+    // MONITOR — neyrojarroh maslahat kerak, lekin darhol emas
     treatmentTactics = [
-      "Neyrojarroh bilan maslahat tavsiya etiladi",
-      "6-12 soatdan keyin KT takrorlash tavsiya etiladi",
+      "Neyrojarroh bilan maslahat o'tkazilsin",
+      "6–12 soatdan keyin KT takrorlansin",
       "Neyrojarrohlik bo'limiga yotqizish ko'rib chiqilsin",
-      "Har soatda nevrologik monitoring tavsiya etiladi",
+      "Har soatda nevrologik monitoring o'tkazilsin",
     ];
-  } else if (decision === 'IMMEDIATE_CT' || decision === 'CT_REQUIRED') {
+  } else if (decision === 'IMMEDIATE_CT') {
+    // DARHOL KT — kechiktirish mumkin emas
     treatmentTactics = [
-      "KT skanini shoshilinch bajarish tavsiya etiladi",
-      "KT natijasi ma'lum bo'lgunicha bemorni kuzatib boring",
-      "Venoz kirish yo'li ta'minlanishi tavsiya etiladi",
-      "GCS har 30 daqiqada baholanishi tavsiya etiladi",
-      "Nevrologik o'zgarishlarni kuzatib boring",
+      "KT darhol bajarilsin — kechiktirish mumkin emas",
+      "Venoz kirish yo'li ta'minlansin",
+      "GCS har 15 daqiqada baholansin",
+      "KT natijasi kelgunicha bemor kuzatilsin",
+    ];
+  } else if (decision === 'CT_REQUIRED') {
+    // KT ZARUR
+    treatmentTactics = [
+      "KT bajarilsin",
+      "Venoz kirish yo'li ta'minlansin",
+      "GCS har 30 daqiqada baholansin",
+      "Nevrologik o'zgarishlar kuzatilsin",
     ];
   } else if (decision === 'CT_RECOMMENDED') {
+    // PAST XAVF — tavsiya etiladi tili to'g'ri
     treatmentTactics = [
       "KT bajarishni ko'rib chiqish tavsiya etiladi",
       "Kuzatish uchun yotqizish ko'rib chiqilsin",
-      "Muntazam nevrologik tekshiruvlar o'tkazing",
+      "Muntazam nevrologik tekshiruvlar o'tkazilsin",
     ];
   } else {
     treatmentTactics = [
       "Kuzatish uchun yotqizish ko'rib chiqilsin",
-      "Yomonlashish belgilarini kuzatib boring",
-      "Kerak bo'lsa neyrojarroh bilan maslahat ko'rib chiqilsin",
+      "Yomonlashish belgilari kuzatilsin",
+      "Zarur bo'lsa neyrojarroh bilan maslahat ko'rib chiqilsin",
     ];
   }
 
@@ -951,29 +963,26 @@ export function analyze(
   const vitalTactics: string[] = [];
 
   if (hasSBP && sbp < 90 && hasSpO2 && spO2 < 90) {
-    // Ikkalasi kritik — bitta birlashgan tavsiya, birinchi qo'yiladi
     vitalTactics.push(
-      `KRITIK: SpO2 ${spO2}% + SBP ${sbp} mmHg — oksigenatsiya VA qon bosimni birgalikda tiklash tavsiya etiladi (EPIC Study 2021, OR 6.1)`
+      `KRITIK: SpO2 ${spO2}% + SBP ${sbp} mmHg — oksigenatsiya VA qon bosim DARHOL tiklansin (EPIC Study 2021, OR 6.1)`
     );
   } else {
-    // SpO2 birinchi — Airway/Breathing (A va B ABCDE bo'yicha)
     if (hasSpO2 && spO2 < 90) {
       vitalTactics.push(
-        `SpO2 ${spO2}% (kritik) — yuqori oqimli O2 yoki intubatsiya ko'rsatmasini baholash tavsiya etiladi. Maqsad SpO2 94% va undan yuqori (BTF 2023)`
+        `SpO2 ${spO2}% (kritik) — yuqori oqimli O2 yoki intubatsiya DARHOL baholansin. Maqsad SpO2 ≥94% (BTF 2023)`
       );
     } else if (hasSpO2 && spO2 < 94) {
       vitalTactics.push(
-        `SpO2 ${spO2}% — O2 terapiyasi tavsiya etiladi (non-rebreather mask). Maqsad 94% va undan yuqori (BTF 2023)`
+        `SpO2 ${spO2}% — O2 terapiyasi boshlansin (non-rebreather mask). Maqsad ≥94% (BTF 2023)`
       );
     }
-    // SBP ikkinchi — Circulation (C)
     if (hasSBP && sbp < 90) {
       vitalTactics.push(
-        `SBP ${sbp} mmHg (kritik) — MAP 80 mmHg va undan yuqori tiklash tavsiya etiladi: suyuqlik va vazopresorlar ko'rsatmasini baholash tavsiya etiladi (BTF 2016/2023)`
+        `SBP ${sbp} mmHg (kritik) — MAP ≥80 mmHg tiklash zarur: suyuqlik va vazopresorlar baholansin (BTF 2016/2023)`
       );
     } else if (hasSBP && sbp < 110) {
       vitalTactics.push(
-        `SBP ${sbp} mmHg — xavfli zona (maqsad 110 mmHg va undan yuqori): suyuqlik optimizatsiyasi va monitoring (ACS TBI 2024)`
+        `SBP ${sbp} mmHg — xavfli zona (maqsad ≥110 mmHg): suyuqlik optimizatsiyasi va monitoring zarur (ACS TBI 2024)`
       );
     }
   }
@@ -1008,21 +1017,21 @@ export function analyze(
   if (input.sex === 'female' && input.pregnancy)
     treatmentTactics.push("Homilador: akusher-ginekolog bilan koordinatsiya; KT bajarilsa qorin sohasini qo'rg'oshin ekran bilan himoya qilish tavsiya etiladi");
   if (input.anticoagulant && ctNormal)
-    treatmentTactics.push("Antikoagulyant + CT normal: 24 soat yotqizish ko'rib chiqilsin — kechikkan qon ketish xavfi (Cohen 2006)");
+    treatmentTactics.push("Antikoagulyant + CT normal: 24 soat yotqizish zarur — kechikkan qon ketish xavfi (Cohen 2006)");
   if (input.anticoagulant && hasHematoma)
-    treatmentTactics.push("Antikoagulyant + gematoma: reversal terapiya ko'rib chiqilsin (warfarin → 4F-PCC; DOAC → idarucizumab/andexanet)");
+    treatmentTactics.push("Antikoagulyant + gematoma: reversal terapiya baholansin (warfarin → 4F-PCC; DOAC → idarucizumab/andexanet)");
   if (input.anticoagulant && hasContusion)
-    treatmentTactics.push("Antikoagulyant + kontuziya: reversal terapiya ko'rib chiqilishi tavsiya etiladi — kechikkan qon ketish xavfi (BTF 2016, Cohen 2006)");
+    treatmentTactics.push("Antikoagulyant + kontuziya: reversal terapiya zarur — kechikkan qon ketish xavfi (BTF 2016, Cohen 2006)");
   if (hasContusion)
-    treatmentTactics.push("Miya kontuziyasi: 6–12 soatdan keyin KT takrorlash tavsiya etiladi — o'lcham oshishi kuzatilsin (BTF 2016)");
+    treatmentTactics.push("Miya kontuziyasi: 6–12 soatdan keyin KT takrorlansin — o'lcham oshishi kuzatilsin (BTF 2016)");
   if (hasFracture)
-    treatmentTactics.push("Bosh suyagi sinishi: neyrojarroh maslahat tavsiya etiladi; asos suyagi sinishi belgilari bo'lsa — tezkor baholash tavsiya etiladi (BTF 2016)");
+    treatmentTactics.push("Bosh suyagi sinishi: neyrojarroh maslahat zarur; asos suyagi sinishi belgilari bo'lsa — tezkor baholash zarur (BTF 2016)");
   if (gcsTotal <= 8 && ctNormal)
-    treatmentTactics.push("GCS <= 8 + CT normal: Diffuz Aksonal Jarohat (DAJ) ehtimoli — MRI tavsiya etiladi (ACS TQIP 2023)");
+    treatmentTactics.push("GCS ≤8 + CT normal: Diffuz Aksonal Jarohat (DAJ) ehtimoli — MRI bajarilsin (ACS TQIP 2023)");
   if ((input.meningealSigns.kernig || input.meningealSigns.brudzinski || input.meningealSigns.neckStiffness) && ctNormal)
     treatmentTactics.push("Meningeal belgilar + CT normal: LP (lyumbar punksiya) ko'rib chiqilishi tavsiya etiladi — SAQ ehtimolini istisno qilish");
   if (comorbidities.includes('coagulopathy'))
-    treatmentTactics.push("Koagulopatiya: INR tekshiruvi va reversal terapiya (4F-PCC) ko'rib chiqilishi tavsiya etiladi (ACS TQIP 2023)");
+    treatmentTactics.push("Koagulopatiya: INR tekshiruvi va reversal terapiya (4F-PCC) baholansin (ACS TQIP 2023)");
   if (comorbidities.includes('epilepsy'))
     treatmentTactics.push("Epilepsiya tarixi: profilaktik antiepileptik ko'rib chiqilsin (Levetiracetam / Fenitoin 7 kun) — BTF 2016");
   if (comorbidities.includes('stroke'))
