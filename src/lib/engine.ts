@@ -990,24 +990,32 @@ export function analyze(
   treatmentTactics = [...vitalTactics, ...treatmentTactics];
 
   // ── POLITRAVMA TAKTIKASI ──────────────────────────────────────────────
+  const isHighUrgency = urgency === 'EMERGENCY' || urgency === 'HIGH';
+
   if (hasPolytrauma) {
     treatmentTactics.push(
-      `Qo'shimcha jarohatlar (${polytravmaZones.join(', ')}) — cABCDE Primary Survey to'liq bajarilishi tavsiya etiladi (WSES 2019)`
+      isHighUrgency
+        ? `Qo'shimcha jarohatlar (${polytravmaZones.join(', ')}) — cABCDE Primary Survey DARHOL bajarilsin (WSES 2019)`
+        : `Qo'shimcha jarohatlar (${polytravmaZones.join(', ')}) — cABCDE Primary Survey bajarilsin (WSES 2019)`
     );
   }
   if (input.complaints?.chestPain && hasSpO2 && spO2 < 94) {
     treatmentTactics.push(
-      `Ko'krak og'rig'i + SpO2 ${spO2}% — ko'krak X-ray / FAST tekshiruvi tavsiya etiladi; pnevmotoraks ehtimolini istisno qilish tavsiya etiladi (WSES 2019)`
+      isHighUrgency
+        ? `Ko'krak og'rig'i + SpO2 ${spO2}% — ko'krak X-ray / FAST bajarilsin; pnevmotoraks istisno qilinsin (WSES 2019)`
+        : `Ko'krak og'rig'i + SpO2 ${spO2}% — ko'krak X-ray / FAST o'tkazilsin; pnevmotoraks istisno qilinsin (WSES 2019)`
     );
   }
   if (input.complaints?.abdominalPain && hasSBP && sbp < 90) {
     treatmentTactics.push(
-      `Qorin og'rig'i + gipotenziya — FAST USS tavsiya etiladi; FAST(+) + beqarorlik bo'lsa laparotomiya ko'rsatmasini baholash tavsiya etiladi (WSES 2020)`
+      `Qorin og'rig'i + gipotenziya — FAST USS bajarilsin; FAST(+) + beqarorlik bo'lsa laparotomiya ko'rsatmasi baholansin (WSES 2020)`
     );
   }
   if (rtsScore !== undefined && rtsScore < 5) {
     treatmentTactics.push(
-      `RTS ${rtsScore} (norma 7.84) — travma markazi aktivatsiyasi ko'rsatmasini baholash tavsiya etiladi (Boyd 1987)`
+      isHighUrgency
+        ? `RTS ${rtsScore} (norma 7.84) — travma markazi aktivatsiyasi zarur (Boyd 1987)`
+        : `RTS ${rtsScore} (norma 7.84) — travma markazi aktivatsiyasi ko'rib chiqilsin (Boyd 1987)`
     );
   }
 
