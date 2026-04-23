@@ -1021,7 +1021,11 @@ export function analyze(
 
   // ── KOMBINATSIYALARGA ASOSLANGAN TAKTIKALAR ───────────────────────────
   if (input.alcoholIntoxication)
-    treatmentTactics.push("Alkogol: hushyor bo'lganda GCS qayta baholanishi tavsiya etiladi; 4–6 soat ichida klinik qayta ko'rish tavsiya etiladi (NICE 2023)");
+    treatmentTactics.push(
+      isHighUrgency
+        ? "Alkogol: hushyor bo'lganda GCS qayta baholansin; 4–6 soat ichida klinik qayta ko'rish zarur (NICE 2023)"
+        : "Alkogol: hushyor bo'lganda GCS qayta baholanishi tavsiya etiladi; 4–6 soat ichida klinik qayta ko'rish (NICE 2023)"
+    );
   if (input.sex === 'female' && input.pregnancy)
     treatmentTactics.push("Homilador: akusher-ginekolog bilan koordinatsiya; KT bajarilsa qorin sohasini qo'rg'oshin ekran bilan himoya qilish tavsiya etiladi");
   if (input.anticoagulant && ctNormal)
