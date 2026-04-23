@@ -22,8 +22,22 @@ import {
 } from './types';
 
 // ── PROTOKOL VAZNLARI (ilmiy asoslangan) ─────────────────────────────────
-// Bu vaznlar faqat TBI protokollari uchun — vital signs va qo'shimcha jarohatlar
-// alohida ierarxik override tizimida ishlaydi (weighted sum emas)
+// ARXITEKTURA IZOHI (FIX 1 — WEIGHTS contradiction hal qilindi):
+//
+// Bu tizim HYBRID arxitekturasi:
+//   • VITAL SIGNS    → PURE HARD OVERRIDE (score ishlatilmaydi, early return)
+//   • NEURO (GCS/CN) → PURE RULE-BASED OVERRIDE (hierarchyOverride orqali)
+//   • CT TOPILMALAR  → PURE RULE-BASED (BTF protokoli, "worst wins")
+//   • TBI PROTOKOLLAR (CCHR+NICE+BTF+GCS+Alkogol) → WEIGHTED SCORE
+//     Sabab: bir nechta protokol bir vaqtda ishlaydi, ular o'rtasida
+//     ilmiy validatsiya qilingan vaznlar bilan yig'ish klinik jihatdan to'g'ri
+//     (Stiell 2001, ACS TQIP 2023 meta-analiz asosida)
+//
+// "Worst wins" qoidasi:
+//   • VITAL override > NEURO override > CT override > WEIGHTED SCORE
+//   • Weighted score faqat herorida yuqori override bo'lmasa ishlatiladi
+//   • Bu contradiction emas — clinical decision support da standard yondashuv
+//
 const WEIGHTS = {
   cchr:    0.35,  // Lancet 2001 — sensitivlik 100%, spetsifiklik 76%
   gcs:     0.30,  // ACS TQIP, BTF 2016 — eng kuchli bashoratlovchi
@@ -33,6 +47,15 @@ const WEIGHTS = {
 };
 
 // ── RTS KODLASH (Boyd et al. 1987, ilmiy validatsiya qilingan) ───────────
+// FIX 4: GCS input validation — dirty data → noto'g'ri decision oldini olish
+function validateGCS(eye: number, verbal: number, motor: number): void {
+  if (eye < 1 || eye > 4)       throw new RangeError(`GCS Ko'z (E) xato: ${eye}. Diapazon: 1–4`);
+  if (verbal < 1 || verbal > 5) throw new RangeError(`GCS So'z (V) xato: ${verbal}. Diapazon: 1–5`);
+  if (motor < 1 || motor > 6)   throw new RangeError(`GCS Harakat (M) xato: ${motor}. Diapazon: 1–6`);
+  const total = eye + verbal + motor;
+  if (total < 3 || total > 15)  throw new RangeError(`GCS jami xato: ${total}. Diapazon: 3–15`);
+}
+
 function rtsCode_GCS(gcs: number): number {
   if (gcs >= 13) return 4;
   if (gcs >= 9)  return 3;
@@ -53,6 +76,29 @@ function rtsCode_RR(rr: number): number {
   if (rr >= 6)              return 2;
   if (rr >= 1)              return 1;
   return 0;
+}
+
+// ── PROTOKOL PRIORITET QATLAMI (FIX 5: conflict resolution) ─────────────
+// Ziddiyatli protokol xulosaları bo'lganda BTF > CCHR > NICE tartibida ishlatiladi
+// Masalan: CCHR → CT kerak, NICE → observation → BTF dan jarrohlik ko'rsatmasi ustuun
+const PROTOCOL_PRIORITY: Record<string, number> = {
+  'BTF':     3,   // Eng yuqori — klinik topilma asosida
+  'CCHR':    2,   // O'rta — xavf mezoni asosida
+  'NICE':    1,   // Pastroq — qo'shimcha omillar
+  'VITAL':   4,   // Hamma narsadan ustun (alohida tizimda)
+  'WSES':    3,
+  'GCS':     3,
+};
+
+// Konfliktli protokollar ichida eng yuqori prioritetlisi qayta ishlashda ustuun bo'ladi
+function resolveProtocolConflict(
+  protocols: Array<{ protocol: string; urgency: string }>
+): string {
+  if (protocols.length === 0) return 'not_required';
+  const sorted = [...protocols].sort(
+    (a, b) => (PROTOCOL_PRIORITY[b.protocol] ?? 0) - (PROTOCOL_PRIORITY[a.protocol] ?? 0)
+  );
+  return sorted[0].urgency;
 }
 
 // ── URGENCY SOLISHTIRISH (worst wins uchun) ──────────────────────────────
@@ -80,6 +126,10 @@ function worstSurgical(
 export function analyze(
   input: ClinicalInput & { otherMechanismLabel?: string }
 ): AnalysisResult {
+
+  // ── FIX 4: GCS VALIDATSIYA — kirish paytida tekshirish ─────────────────
+  // Noto'g'ri GCS → butun engine noto'g'ri qaror chiqaradi
+  validateGCS(input.gcs.eye, input.gcs.verbal, input.gcs.motor);
 
   const gcsTotal     = input.gcs.eye + input.gcs.verbal + input.gcs.motor;
   const comorbidities = input.comorbidities ?? [];
@@ -118,7 +168,92 @@ export function analyze(
   const xaiEntries: XaiEntry[] = [];
 
   // ════════════════════════════════════════════════════════════════════
-  // QATLAM 1: FIZIOLOGIYA (SBP / SpO2 / RR)
+  // !! FIX 3: PHYSIOLOGY HARD OVERRIDE — EARLY RETURN !!
+  // SBP / SpO2 kritik bo'lsa → darhol EMERGENCY qaror qaytariladi
+  // Boshqa hech qanday logika ishlamaydi — "worst wins" to'liq amalga oshiriladi
+  // Manba: IMPACT model, BTF 2016/2023, EPIC Study 2021, ACS TBI 2024
+  // ════════════════════════════════════════════════════════════════════
+  const hasSBP_early  = input.sbp  !== undefined && input.sbp  > 0;
+  const hasSpO2_early = input.spO2 !== undefined;
+  const sbp_early     = input.sbp  ?? 0;
+  const spO2_early    = input.spO2 ?? 100;
+
+  if ((hasSBP_early && sbp_early < 90) && (hasSpO2_early && spO2_early < 90)) {
+    // Eng yomon kombinatsiya: Gipoksiya + Gipotenziya birgalikda
+    const earlyXai: XaiEntry = {
+      fact:   `SpO2 = ${spO2_early}%, SBP = ${sbp_early} mmHg`,
+      effect: 'Gipoksiya + gipotenziya birgalikda — miya qon ta\'minoti ikki tomondan buziladi',
+      impact: `O'lim xavfi ~14 baravar oshadi (adjusted OR 6.1, EPIC Study 2021)`,
+      source: 'EPIC Study 2021, BTF 2016, WSES 2019'
+    };
+    const earlyRule: TriggeredRule = {
+      id: 'VIT-COMB', name: 'Gipoksiya + Gipotenziya',
+      protocol: 'VITAL', riskLevel: 'high',
+      description: `SpO2 ${spO2_early}% + SBP ${sbp_early} mmHg — SINERGISTIK ikkilamchi TBI jarohati (EPIC Study 2021, OR 6.1, 14x o'lim xavfi)`,
+      weight: 1.0
+    };
+    // Minimal severity aniqlash
+    let earlySeverity: Severity;
+    if      (gcsTotal >= 13) earlySeverity = 'mild';
+    else if (gcsTotal >= 9)  earlySeverity = 'moderate';
+    else if (gcsTotal >= 6)  earlySeverity = 'severe';
+    else                     earlySeverity = 'critical';
+
+    return {
+      decision: 'SURGICAL_EVALUATION',
+      urgency: 'EMERGENCY',
+      confidence: 0.95,
+      confidencePenalties: [],
+      score: 100,
+      severity: earlySeverity,
+      gcsTotal,
+      rtsScore: undefined,
+      hasPolytrauma: false,
+      polytravmaZones: [],
+      xaiEntries: [earlyXai],
+      reasons: [
+        `SpO2 ${spO2_early}% < 90% VA SBP ${sbp_early} mmHg < 90 — SINERGISTIK KRITIK holat`,
+        'PHYSIOLOGY HARD OVERRIDE: boshqa barcha parametrlar ikkinchi o\'rinda'
+      ],
+      sources: ['VITAL', 'EPIC Study 2021', 'BTF 2016', 'IMPACT'],
+      summary: 'Qaror asosi: PHYSIOLOGY HARD OVERRIDE (Gipoksiya + Gipotenziya)',
+      decisionLayer: 'VITAL (SBP + SpO2 ikkalasi kritik)',
+      breakdown: {
+        cchr:    { score: 0, weight: 0.35, contribution: 0, rules: [] },
+        gcs:     { score: 0, weight: 0.30, contribution: 0, rules: [] },
+        btf:     { score: 0, weight: 0.20, contribution: 0, rules: [] },
+        nice:    { score: 0, weight: 0.10, contribution: 0, rules: [] },
+        alcohol: { score: 0, weight: 0.05, contribution: 0, rules: [] },
+        vital:   { score: 100, weight: 0, contribution: 100, rules: [earlyRule] },
+      },
+      treatmentTactics: [
+        `KRITIK: SpO2 ${spO2_early}% + SBP ${sbp_early} mmHg — oksigenatsiya VA qon bosim DARHOL tiklansin (EPIC Study 2021, OR 6.1)`,
+        'Neyrojarroh DARHOL chaqirilsin',
+        'Shoshilinch KT bajarilsin (agar bajarilmagan) — natijaga qarab jarrohlik hal qilinadi',
+        'ICP oshishi bo\'lsa — IV mannitol yuborilsin (1 g/kg, BTF 2016)',
+        'Bosh 30 daraja ko\'tarilgan holda ushlab turilsin',
+        'GCS har 15 daqiqada baholansin',
+        'MAP 80 mmHg va undan yuqori ushlab turilsin',
+        'Bemor NPO (bo\'sh qorin) holatida saqlash zarur',
+      ],
+      surgicalUrgency: 'emergency',
+      hematomaSurgery: null,
+      pubmedQuery: 'hypotension hypoxia traumatic brain injury secondary insult outcome',
+      pubmedQueries: ['hypotension hypoxia traumatic brain injury secondary insult outcome'],
+      disclaimer: "Bu tizim klinik qaror qabul qilishni qo'llab-quvvatlash uchun mo'ljallangan. Har bir tavsiya klinik kontekst va shifokor hukmiga bog'liq. Yakuniy qaror doimo shifokorga tegishli.",
+      patientInfo: {
+        age: input.age,
+        sex: input.sex === 'male' ? 'Erkak' : 'Ayol',
+        traumaMechanism: input.traumaMechanism,
+        ctFindings: input.ctFindings ?? [],
+      },
+      analyzedAt: new Date().toISOString(),
+    };
+  }
+  // ════════════════════════════════════════════════════════════════════
+  // Alohida kritik holat: faqat SBP < 90 (SpO2 normal yoki kiritilmagan)
+  // Bu early return emas — lekin vitalOverride='urgent' sifatida saqlanadi
+  // ════════════════════════════════════════════════════════════════════
   // Eng yuqori prioritet — hamma narsani override qiladi
   // Manba: IMPACT model, BTF 2016/2023, EPIC Study 2021, ACS TBI 2024
   // ════════════════════════════════════════════════════════════════════
@@ -396,6 +531,38 @@ export function analyze(
       impact: "6–12 soatdan keyin KT takrorlash zarur; o'lcham oshishi yoki klinik yomonlashish bo'lsa neyrojarroh maslahat zarur",
       source: "BTF 2016, ACS TQIP 2023"
     });
+
+    // FIX 2A: Kontuziya o'lchami bo'yicha qo'shimcha gradatsiya
+    // Katta kontuziya (>20ml) → jarrohlik baholash (BTF 2016)
+    if (input.hematomaVolume !== undefined && input.hematomaVolume >= 20 && !hasHematoma) {
+      btfScore = Math.max(btfScore, 80);
+      hematomaSurgery = 'surgery_required';
+      surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+      btfRules.push({
+        id: 'BTF-CONT-VOL', name: 'Kontuziya ≥ 20ml', protocol: 'BTF', riskLevel: 'high',
+        description: `Miya kontuziyasi ≥ 20ml (${input.hematomaVolume}ml) — jarrohlik baholash zarur (BTF 2016)`,
+        weight: 0.80
+      });
+      xaiEntries.push({
+        fact:   `Kontuziya hajmi: ${input.hematomaVolume}ml`,
+        effect: "Katta kontuziya → ICP oshishi va mass effect xavfi yuqori",
+        impact: "BTF 2016: katta kontuziya (≥20ml) jarrohlik ko'rsatmasi bo'lishi mumkin — neyrojarroh DARHOL chaqirilsin",
+        source: "BTF 2016, ACS TQIP 2023"
+      });
+    }
+
+    // FIX 2B: Midline shift + kontuziya → mass effect xavfi
+    if (input.midlineShift !== undefined && input.midlineShift > 5 && !hasHematoma) {
+      btfScore = Math.max(btfScore, 90);
+      hematomaSurgery = 'surgery_required';
+      surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
+      btfRules.push({
+        id: 'BTF-CONT-SHIFT', name: 'Kontuziya + Siljish > 5mm', protocol: 'BTF', riskLevel: 'high',
+        description: `Miya kontuziyasi + o'rta chiziq siljishi ${input.midlineShift}mm > 5mm — mass effect, neyrojarroh maslahat zarur (BTF 2016)`,
+        weight: 0.90
+      });
+    }
+
     // Kombinatsiya: Kontuziya + GCS <= 8 → jarrohlik baholash tavsiya etiladi
     if (gcsTotal <= 8) {
       btfScore = Math.max(btfScore, 85);
@@ -417,6 +584,25 @@ export function analyze(
         weight: 0.70
       });
     }
+  }
+
+  // FIX 2C: CT 'other' findings — ignore qilmaslik
+  const hasOtherCT = ctFindings.includes('other');
+  if (hasOtherCT && !hasHematoma && !hasContusion && !hasFracture) {
+    btfScore = Math.max(btfScore, 45);
+    hematomaSurgery = hematomaSurgery ?? 'repeat_ct';
+    surgicalUrgency = worstSurgical(surgicalUrgency, 'monitor');
+    btfRules.push({
+      id: 'BTF-OTHER', name: 'KT — boshqa patologiya', protocol: 'BTF', riskLevel: 'medium',
+      description: "KT da aniqlanmagan patologiya ('boshqa') — neyroradiolog bilan maslahat zarur, takroriy KT ko'rib chiqilsin (BTF 2016)",
+      weight: 0.45
+    });
+    xaiEntries.push({
+      fact:   "KT natijasi: Boshqa patologiya aniqlangan",
+      effect: "Noaniq KT topilma — diffuz aksonal jarohat (DAJ), edema yoki boshqa patologiya bo'lishi mumkin",
+      impact: "Neyroradiolog sharhi va 6–12 soatdan keyin takroriy KT zarur (BTF 2016)",
+      source: "BTF 2016, Helsinki CT Score 2022"
+    });
   }
 
   // ── SUYAK SINISHI (BTF 2016) ──────────────────────────────────────────
@@ -668,6 +854,13 @@ export function analyze(
       impact: 'Neyrojarrohlik baholash zarur. Shoshilinch KT (agar bajarilmagan bo\'lsa) — KT natijasiga qarab jarrohlik masalasi hal qilinadi (BTF 2016)',
       source: 'BTF 2016, EMCrit, ENLS 6.0'
     });
+    // FIX 6: Override sababi XAI da aniq ko'rsatiladi
+    xaiEntries.push({
+      fact:   'OVERRIDE SABABI: Anizokoria',
+      effect: 'Boshqa barcha parametrlar (CCHR, NICE, score) ikkinchi o\'ringa tushdi',
+      impact: 'NEURO HARD OVERRIDE ishga tushdi — qaror: FAVQULODDA JARROHLIK BAHOLASH',
+      source: 'BTF 2016: "worst wins" prinsipi — eng yomon neuro belgi qarorni belgilaydi'
+    });
   }
 
   // K25: CN III patologik (anizokoria yo'q bo'lsa)
@@ -684,6 +877,13 @@ export function analyze(
   if (vitalOverride === 'emergency' && hierarchyOverride !== 'emergency') {
     hierarchyOverride = 'emergency';
     surgicalUrgency = worstSurgical(surgicalUrgency, 'emergency');
+    // FIX 6: Override sababi XAI da ko'rsatiladi
+    xaiEntries.push({
+      fact:   `VITAL OVERRIDE: SBP ${sbp} mmHg < 90 YOKI SpO2 ${spO2}% < 90%`,
+      effect: 'Fiziologiya override — barcha boshqa protokollardan ustun',
+      impact: 'VITAL HARD OVERRIDE: qaror EMERGENCY ga o\'zgartirildi',
+      source: 'IMPACT model, BTF 2016, EPIC Study 2021'
+    });
   }
 
   // ── DARAJA 2: SHOSHILINCH ─────────────────────────────────────────────
@@ -691,6 +891,13 @@ export function analyze(
   // Vital signs urgent
   if (vitalOverride === 'urgent' && hierarchyOverride === null) {
     hierarchyOverride = 'urgent';
+    // FIX 6: XAI log
+    xaiEntries.push({
+      fact:   `VITAL OVERRIDE URGENT: SBP=${hasSBP ? sbp : 'kiritilmagan'}, SpO2=${hasSpO2 ? spO2 : 'kiritilmagan'}%`,
+      effect: 'Vital signs protokoli "urgent" darajasiga ko\'tardi',
+      impact: 'Urgency: HIGH — darhol monitoring va stablizatsiya zarur',
+      source: 'BTF 2016, ACS TBI 2024'
+    });
   }
 
   // K_GCS13: GCS < 13 — NICE CG176 to'g'ridan-to'g'ri CT qaror beruvchi (decision maker)
@@ -699,6 +906,13 @@ export function analyze(
     hierarchyOverride = 'urgent';
     surgicalUrgency = worstSurgical(surgicalUrgency, 'urgent');
     overrideReasons.push(`GCS ${gcsTotal} < 13 — NICE CG176: darhol CT zarur`);
+    // FIX 6: XAI log
+    xaiEntries.push({
+      fact:   `GCS ${gcsTotal} < 13`,
+      effect: 'NICE CG176 2023: GCS < 13 = darhol CT ko\'rsatmasi',
+      impact: 'NEURO OVERRIDE: urgency HIGH ga ko\'tarildi — weighted score ikkinchi o\'rinda',
+      source: 'NICE CG176 2023, CCHR Lancet 2001'
+    });
   }
 
   // K4: Antikoagulyant + har qanday TBI (Cohen 2006, EFNS)
