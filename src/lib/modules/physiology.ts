@@ -11,7 +11,7 @@ import { TriggeredRule, XaiEntry, AnalysisResult } from '../types';
 
 export interface PhysiologyResult {
   vitalScore: number;
-  vitalOverride: 'emergency' | 'urgent' | null;
+  vitalOverride: 'urgent' | null;  // 'emergency' faqat engine.ts early return orqali — bu modul 'urgent' gacha chiqaradi
   surgicalUrgencyDelta: AnalysisResult['surgicalUrgency'];
   vitalRules: TriggeredRule[];
   xaiEntries: XaiEntry[];
@@ -60,7 +60,7 @@ export function assessPhysiology(params: {
   const vitalRules: TriggeredRule[] = [];
   const xaiEntries: XaiEntry[] = [];
   let vitalScore   = 0;
-  let vitalOverride: 'emergency' | 'urgent' | null = null;
+  let vitalOverride: 'urgent' | null = null;
   let surgicalUrgencyDelta: AnalysisResult['surgicalUrgency'] = 'not_required';
 
   // NOT: SBP < 90 && SpO2 < 90 kombinatsiyasi engine.ts da early return sifatida handle qilingan

@@ -343,7 +343,8 @@ export function analyze(
 
   const vitalRules    = physResult.vitalRules;
   const vitalScore    = physResult.vitalScore;
-  const vitalOverride = physResult.vitalOverride;
+  // physiology.ts max 'urgent' qaytaradi — 'emergency' faqat engine early return orqali
+  const vitalOverride: 'urgent' | null = physResult.vitalOverride;
   const rtsScore      = physResult.rtsScore;
   let surgicalUrgency: AnalysisResult['surgicalUrgency'] = physResult.surgicalUrgencyDelta;
 
@@ -790,18 +791,8 @@ export function analyze(
     overrideReasons.push("CN III falaji — herniatsiya belgisi");
   }
 
-  // Vital signs emergency (fiziologiya qatlami natijasi)
-  if (vitalOverride === 'emergency' && hierarchyOverride !== 'emergency') {
-    hierarchyOverride = 'emergency';
-    surgicalUrgency = worstSurgical(surgicalUrgency, 'emergency');
-    // FIX 6: Override sababi XAI da ko'rsatiladi
-    xaiEntries.push({
-      fact:   `VITAL OVERRIDE: SBP ${sbp} mmHg < 90 YOKI SpO2 ${spO2}% < 90%`,
-      effect: 'Fiziologiya override — barcha boshqa protokollardan ustun',
-      impact: 'VITAL HARD OVERRIDE: qaror EMERGENCY ga o\'zgartirildi',
-      source: 'IMPACT model, BTF 2016, EPIC Study 2021'
-    });
-  }
+  // NOT: vitalOverride === 'emergency' holati early return orqali allaqachon hal qilingan (yuqorida)
+  // physiology.ts max 'urgent' qaytaradi — bu qatlam faqat 'urgent' ni hierarchyOverride ga ko'chiradi
 
   // ── DARAJA 2: SHOSHILINCH ─────────────────────────────────────────────
 
@@ -1382,8 +1373,10 @@ export function analyze(
   // Qaror qaysi qatlamdan keldi — shifokorga tushuntirish uchun
   let decisionLayer: string;
   if (hierarchyOverride === 'emergency' || surgicalUrgency === 'emergency') {
-    decisionLayer = vitalOverride === 'emergency'
-      ? 'VITAL (SBP/SpO2 kritik)'
+    // Early return orqali kelgan VITAL emergency holatlari bu yerga yetib kelmaydi
+    // Bu yerda: NEURO (anizokoria / CN III) yoki BTF (gematoma+siljish+GCS) sabab emergency
+    decisionLayer = (surgicalUrgency === 'emergency' && btfScore === 100)
+      ? 'CT natijasi (BTF FAVQULODDA)'
       : 'NEURO (anizokoria / CN III / GCS kritik)';
   } else if (hierarchyOverride === 'urgent') {
     if (vitalOverride === 'urgent') decisionLayer = 'VITAL (SBP/SpO2)';

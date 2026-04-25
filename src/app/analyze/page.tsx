@@ -21,6 +21,7 @@ const defaultInput = (): ClinicalInput => ({
   ctStatus: 'not_done' as 'not_done' | 'normal',
   ctFindings: [] as Array<'hematoma' | 'contusion' | 'fracture' | 'other'>,
   hematomaType: undefined, hematomaVolume: undefined, hematomaThickness: undefined, midlineShift: undefined,
+  contusionVolume: undefined,
   diabetes: false, hypertensionHistory: false,
   comorbidities: [],
 });
@@ -118,7 +119,7 @@ export default function AnalyzePage() {
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
   const [otherMechanism, setOtherMechanism] = useState('');
-  const TOTAL_STEPS = 5;
+  const TOTAL_STEPS = 6;
 
   useEffect(() => {
     const cookie = document.cookie.split(';').find(c => c.trim().startsWith('algorimed_user='));
@@ -341,10 +342,136 @@ export default function AnalyzePage() {
             </div>
           )}
 
-          {/* ── QADAM 2: GCS VA KLINIK ── */}
+          {/* ── QADAM 2: VITAL BELGILAR (BIRINCHI) ── */}
           {step === 2 && (
             <div className={styles.stepContent}>
-              <div className={styles.stepTitle}>2-qadam: GCS va klinik ko&apos;rsatkichlar</div>
+              <div className={styles.stepTitle}>2-qadam: Vital belgilar</div>
+              <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
+                Fiziologiya eng yuqori prioritet — boshqa barcha ko'rsatkichlardan oldin baholanadi (BTF 2023, IMPACT model)
+              </p>
+
+              <div className={styles.card}>
+                <h3 className={styles.cardTitle}>Vital belgilar</h3>
+                <p className={styles.cardDesc}>RTS (Boyd 1987) · IMPACT model · BTF 2023 · ACS TBI 2024</p>
+
+                <div className={styles.row2} style={{ marginBottom: 16 }}>
+                  {/* SBP */}
+                  <div className={styles.field}>
+                    <label className={styles.label}>
+                      Sistolik qon bosim (SBP) <span style={{ color: 'var(--muted)', fontWeight: 400 }}>mmHg</span>
+                    </label>
+                    <input
+                      type="number" className={styles.input} min={0} max={300}
+                      placeholder="masalan: 120"
+                      value={form.sbp ?? ''}
+                      onChange={e => setVital('sbp', e.target.value ? parseInt(e.target.value) : undefined)}
+                    />
+                    {form.sbp !== undefined && form.sbp < 90 && (
+                      <span className={styles.hintDanger}>🚨 KRITIK: SBP &lt; 90 mmHg — gipotenziya (OR o'lim 4.36)</span>
+                    )}
+                    {form.sbp !== undefined && form.sbp >= 90 && form.sbp < 110 && (
+                      <span className={styles.hint}>⚠️ Xavfli zona: SBP &lt; 110 mmHg (maqsad ≥110)</span>
+                    )}
+                    {form.sbp !== undefined && form.sbp >= 110 && (
+                      <span style={{ color: '#27ae60', fontSize: 12 }}>✓ Maqsad SBP ≥110 mmHg</span>
+                    )}
+                  </div>
+
+                  {/* SpO2 */}
+                  <div className={styles.field}>
+                    <label className={styles.label}>
+                      Oksigen saturatsiyasi (SpO2) <span style={{ color: 'var(--muted)', fontWeight: 400 }}>%</span>
+                    </label>
+                    <input
+                      type="number" className={styles.input} min={0} max={100}
+                      placeholder="masalan: 98"
+                      value={form.spO2 ?? ''}
+                      onChange={e => setVital('spO2', e.target.value ? parseInt(e.target.value) : undefined)}
+                    />
+                    {form.spO2 !== undefined && form.spO2 < 90 && (
+                      <span className={styles.hintDanger}>🚨 KRITIK: SpO2 &lt; 90% — gipoksiya (OR o'lim 3.86)</span>
+                    )}
+                    {form.spO2 !== undefined && form.spO2 >= 90 && form.spO2 < 94 && (
+                      <span className={styles.hint}>⚠️ Xavfli zona: SpO2 &lt; 94% (maqsad ≥94%)</span>
+                    )}
+                    {form.spO2 !== undefined && form.spO2 >= 94 && (
+                      <span style={{ color: '#27ae60', fontSize: 12 }}>✓ Maqsad SpO2 ≥94%</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Nafas tezligi */}
+                <div className={styles.field}>
+                  <label className={styles.label}>
+                    Nafas tezligi <span style={{ color: 'var(--muted)', fontWeight: 400 }}>nafas/daqiqa (ixtiyoriy)</span>
+                  </label>
+                  <input
+                    type="number" className={styles.input} min={0} max={60}
+                    placeholder="masalan: 16"
+                    value={form.respiratoryRate ?? ''}
+                    onChange={e => setVital('respiratoryRate', e.target.value ? parseInt(e.target.value) : undefined)}
+                  />
+                  {form.respiratoryRate !== undefined && (form.respiratoryRate < 10 || form.respiratoryRate > 29) && (
+                    <span className={styles.hint}>⚠️ Anormal nafas: {form.respiratoryRate < 10 ? 'bradipnoe' : 'taxipnoe'} — RTS pasaygan</span>
+                  )}
+                </div>
+
+                {/* RTS ko'rsatkichi */}
+                {form.sbp !== undefined && form.respiratoryRate !== undefined && (
+                  <div style={{
+                    marginTop: 16, padding: '10px 14px', borderRadius: 8,
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    display: 'flex', alignItems: 'center', gap: 12
+                  }}>
+                    <span style={{ fontSize: 13, color: 'var(--muted)' }}>Taxminiy RTS:</span>
+                    {(() => {
+                      const gcsK = gcsTotal >= 13 ? 4 : gcsTotal >= 9 ? 3 : gcsTotal >= 6 ? 2 : gcsTotal >= 4 ? 1 : 0;
+                      const sbpK = (form.sbp ?? 0) > 89 ? 4 : (form.sbp ?? 0) > 75 ? 3 : (form.sbp ?? 0) > 49 ? 2 : (form.sbp ?? 0) > 0 ? 1 : 0;
+                      const rrK  = (form.respiratoryRate ?? 0) >= 10 && (form.respiratoryRate ?? 0) <= 29 ? 4 :
+                                   (form.respiratoryRate ?? 0) > 29 ? 3 : (form.respiratoryRate ?? 0) >= 6 ? 2 :
+                                   (form.respiratoryRate ?? 0) >= 1 ? 1 : 0;
+                      const rts = Math.round((0.9368 * gcsK + 0.7326 * sbpK + 0.2908 * rrK) * 100) / 100;
+                      const rtsColor = rts >= 7 ? '#27ae60' : rts >= 5 ? '#e67e22' : '#c0392b';
+                      return (
+                        <>
+                          <strong style={{ color: rtsColor, fontSize: 18 }}>{rts}</strong>
+                          <span style={{ fontSize: 12, color: rtsColor }}>
+                            {rts >= 7 ? '— Yaxshi' : rts >= 5 ? "— O'rta xavf" : '— YUQORI XAVF (norma: 7.84)'}
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Sinergistik ogohlantirish */}
+                {form.sbp !== undefined && form.sbp < 90 && form.spO2 !== undefined && form.spO2 < 90 && (
+                  <div style={{
+                    marginTop: 12, padding: '12px 16px', borderRadius: 8,
+                    background: '#FCEBEB', border: '2px solid #A32D2D', color: '#A32D2D'
+                  }}>
+                    🚨 <strong>SINERGISTIK IKKILAMCHI JAROHAT</strong> — Gipoksiya + Gipotenziya birgalikda: 14x o'lim xavfi (EPIC Study 2021, adjusted OR 6.1)
+                  </div>
+                )}
+
+                {/* SpO2 kiritilmagan ogohlantirish — YANGI */}
+                {form.spO2 === undefined && (
+                  <div style={{
+                    marginTop: 12, padding: '10px 14px', borderRadius: 8,
+                    background: '#FFF8E7', border: '1px solid #E6A817', color: '#7A5200', fontSize: 13
+                  }}>
+                    ℹ️ SpO2 kiritilmagan — o'lchash imkoni bo'lsa kiritish tavsiya etiladi. Kiritilmagan holda ishonch darajasi −7% pasayadi.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── QADAM 3: GCS VA KLINIK KO'RSATKICHLAR ── */}
+          {/* ── QADAM 3: GCS VA KLINIK KO'RSATKICHLAR ── */}
+          {step === 3 && (
+            <div className={styles.stepContent}>
+              <div className={styles.stepTitle}>3-qadam: GCS va klinik ko&apos;rsatkichlar</div>
 
               {/* Shikoyatlar */}
               <div className={styles.card}>
@@ -477,116 +604,10 @@ export default function AnalyzePage() {
           )}
 
 
-          {/* ── QADAM 3: VITAL BELGILAR VA POLITRAVMA ── */}
-          {step === 3 && (
+          {/* ── QADAM 4: QO'SHIMCHA JAROHATLAR VA CCHR/KT ── */}
+          {step === 4 && (
             <div className={styles.stepContent}>
-              <div className={styles.stepTitle}>3-qadam: Vital belgilar va qo&apos;shimcha jarohatlar</div>
-
-              {/* Vital signs */}
-              <div className={styles.card}>
-                <h3 className={styles.cardTitle}>Vital belgilar</h3>
-                <p className={styles.cardDesc}>RTS (Boyd 1987) · IMPACT model · BTF 2023 · ACS TBI 2024</p>
-
-                <div className={styles.row2} style={{ marginBottom: 16 }}>
-                  {/* SBP */}
-                  <div className={styles.field}>
-                    <label className={styles.label}>
-                      Sistolik qon bosim (SBP) <span style={{ color: 'var(--muted)', fontWeight: 400 }}>mmHg</span>
-                    </label>
-                    <input
-                      type="number" className={styles.input} min={0} max={300}
-                      placeholder="masalan: 120"
-                      value={form.sbp ?? ''}
-                      onChange={e => setVital('sbp', e.target.value ? parseInt(e.target.value) : undefined)}
-                    />
-                    {form.sbp !== undefined && form.sbp < 90 && (
-                      <span className={styles.hintDanger}>🚨 KRITIK: SBP &lt; 90 mmHg — gipotenziya (OR o'lim 4.36)</span>
-                    )}
-                    {form.sbp !== undefined && form.sbp >= 90 && form.sbp < 110 && (
-                      <span className={styles.hint}>⚠️ Xavfli zona: SBP &lt; 110 mmHg (maqsad ≥110)</span>
-                    )}
-                    {form.sbp !== undefined && form.sbp >= 110 && (
-                      <span style={{ color: '#27ae60', fontSize: 12 }}>✓ Maqsad SBP ≥110 mmHg</span>
-                    )}
-                  </div>
-
-                  {/* SpO2 */}
-                  <div className={styles.field}>
-                    <label className={styles.label}>
-                      Oksigen saturatsiyasi (SpO2) <span style={{ color: 'var(--muted)', fontWeight: 400 }}>%</span>
-                    </label>
-                    <input
-                      type="number" className={styles.input} min={0} max={100}
-                      placeholder="masalan: 98"
-                      value={form.spO2 ?? ''}
-                      onChange={e => setVital('spO2', e.target.value ? parseInt(e.target.value) : undefined)}
-                    />
-                    {form.spO2 !== undefined && form.spO2 < 90 && (
-                      <span className={styles.hintDanger}>🚨 KRITIK: SpO2 &lt; 90% — gipoksiya (OR o'lim 3.86)</span>
-                    )}
-                    {form.spO2 !== undefined && form.spO2 >= 90 && form.spO2 < 94 && (
-                      <span className={styles.hint}>⚠️ Xavfli zona: SpO2 &lt; 94% (maqsad ≥94%)</span>
-                    )}
-                    {form.spO2 !== undefined && form.spO2 >= 94 && (
-                      <span style={{ color: '#27ae60', fontSize: 12 }}>✓ Maqsad SpO2 ≥94%</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Nafas tezligi */}
-                <div className={styles.field}>
-                  <label className={styles.label}>
-                    Nafas tezligi <span style={{ color: 'var(--muted)', fontWeight: 400 }}>nafas/daqiqa (ixtiyoriy)</span>
-                  </label>
-                  <input
-                    type="number" className={styles.input} min={0} max={60}
-                    placeholder="masalan: 16"
-                    value={form.respiratoryRate ?? ''}
-                    onChange={e => setVital('respiratoryRate', e.target.value ? parseInt(e.target.value) : undefined)}
-                  />
-                  {form.respiratoryRate !== undefined && (form.respiratoryRate < 10 || form.respiratoryRate > 29) && (
-                    <span className={styles.hint}>⚠️ Anormal nafas: {form.respiratoryRate < 10 ? 'bradipnoe' : 'taxipnoe'} — RTS pasaygan</span>
-                  )}
-                </div>
-
-                {/* RTS ko'rsatkichi */}
-                {form.sbp !== undefined && form.respiratoryRate !== undefined && (
-                  <div style={{
-                    marginTop: 16, padding: '10px 14px', borderRadius: 8,
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                    display: 'flex', alignItems: 'center', gap: 12
-                  }}>
-                    <span style={{ fontSize: 13, color: 'var(--muted)' }}>Taxminiy RTS:</span>
-                    {(() => {
-                      const gcsK = gcsTotal >= 13 ? 4 : gcsTotal >= 9 ? 3 : gcsTotal >= 6 ? 2 : gcsTotal >= 4 ? 1 : 0;
-                      const sbpK = (form.sbp ?? 0) > 89 ? 4 : (form.sbp ?? 0) > 75 ? 3 : (form.sbp ?? 0) > 49 ? 2 : (form.sbp ?? 0) > 0 ? 1 : 0;
-                      const rrK  = (form.respiratoryRate ?? 0) >= 10 && (form.respiratoryRate ?? 0) <= 29 ? 4 :
-                                   (form.respiratoryRate ?? 0) > 29 ? 3 : (form.respiratoryRate ?? 0) >= 6 ? 2 :
-                                   (form.respiratoryRate ?? 0) >= 1 ? 1 : 0;
-                      const rts = Math.round((0.9368 * gcsK + 0.7326 * sbpK + 0.2908 * rrK) * 100) / 100;
-                      const rtsColor = rts >= 7 ? '#27ae60' : rts >= 5 ? '#e67e22' : '#c0392b';
-                      return (
-                        <>
-                          <strong style={{ color: rtsColor, fontSize: 18 }}>{rts}</strong>
-                          <span style={{ fontSize: 12, color: rtsColor }}>
-                            {rts >= 7 ? '— Yaxshi' : rts >= 5 ? "— O'rta xavf" : '— YUQORI XAVF (norma: 7.84)'}
-                          </span>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {/* Gipoksiya + Gipotenziya ogohlantirish */}
-                {form.sbp !== undefined && form.sbp < 90 && form.spO2 !== undefined && form.spO2 < 90 && (
-                  <div style={{
-                    marginTop: 12, padding: '12px 16px', borderRadius: 8,
-                    background: '#FCEBEB', border: '2px solid #A32D2D', color: '#A32D2D'
-                  }}>
-                    🚨 <strong>SINERGISTIK IKKILAMCHI JAROHAT</strong> — Gipoksiya + Gipotenziya birgalikda: 14x o'lim xavfi (EPIC Study 2021, adjusted OR 6.1)
-                  </div>
-                )}
-              </div>
+              <div className={styles.stepTitle}>4-qadam: Qo&apos;shimcha jarohatlar va CCHR/KT</div>
 
               {/* Qo'shimcha jarohatlar shikoyatlari */}
               <div className={styles.card}>
@@ -640,9 +661,10 @@ export default function AnalyzePage() {
           )}
 
           {/* ── QADAM 4: CCHR VA KT ── */}
-          {step === 4 && (
+          {/* ── QADAM 5: CCHR VA KT NATIJALARI ── */}
+          {step === 5 && (
             <div className={styles.stepContent}>
-              <div className={styles.stepTitle}>4-qadam: CCHR va KT natijalari</div>
+              <div className={styles.stepTitle}>5-qadam: CCHR va KT natijalari</div>
 
               <div className={styles.card}>
                 <h3 className={styles.cardTitle}>CCHR Qo&apos;shimcha mezonlar</h3>
@@ -679,6 +701,7 @@ export default function AnalyzePage() {
                           set('hematomaVolume', undefined);
                           set('hematomaThickness', undefined);
                           set('midlineShift', undefined);
+                          set('contusionVolume', undefined);
                         }
                       }}>
                       <span>{icon}</span><span>{name}</span>
@@ -758,14 +781,40 @@ export default function AnalyzePage() {
                     </div>
                   </div>
                 )}
+
+                {form.ctFindings.includes('contusion') && (
+                  <div className={styles.hematomaFields}>
+                    <div className={styles.cardTitle} style={{ marginBottom: 14 }}>Kontuziya tafsilotlari (BTF protokoli)</div>
+                    <div className={styles.row2}>
+                      <div className={styles.field}>
+                        <label className={styles.label}>Kontuziya hajmi (ml)</label>
+                        <input type="number" className={styles.input} min={0} placeholder="masalan: 15"
+                          value={form.contusionVolume ?? ''}
+                          onChange={e => set('contusionVolume', parseFloat(e.target.value) || undefined)} />
+                        {(form.contusionVolume ?? 0) >= 20 && (
+                          <span className={styles.hintDanger}>⚠️ ≥20ml — jarrohlik baholash ko&apos;rsatmasi (BTF 2016)</span>
+                        )}
+                      </div>
+                      <div className={styles.field}>
+                        <label className={styles.label}>O&apos;rta chiziq siljishi (mm)</label>
+                        <input type="number" className={styles.input} min={0} placeholder="masalan: 3"
+                          value={form.midlineShift ?? ''}
+                          onChange={e => set('midlineShift', parseFloat(e.target.value) || undefined)} />
+                        {(form.midlineShift ?? 0) > 5 && (
+                          <span className={styles.hintDanger}>⚠️ Siljish &gt; 5mm — jarrohlik ko&apos;rsatmasi</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* ── QADAM 5: YAKUNIY TEKSHIRUV ── */}
-          {step === 5 && (
+          {/* ── QADAM 6: YAKUNIY TEKSHIRUV ── */}
+          {step === 6 && (
             <div className={styles.stepContent}>
-              <div className={styles.stepTitle}>5-qadam: Yakuniy tekshiruv va tahlil</div>
+              <div className={styles.stepTitle}>6-qadam: Yakuniy tekshiruv va tahlil</div>
 
               <div className={styles.reviewGrid}>
                 <div className={styles.reviewCard}>
@@ -878,9 +927,39 @@ export default function AnalyzePage() {
             <button type="button" className={styles.prevBtn} onClick={() => setStep(s => Math.max(1, s-1))} disabled={step === 1}>← Orqaga</button>
             <span className={styles.stepLabel}>{step} / {TOTAL_STEPS}</span>
             {step < TOTAL_STEPS
-              ? <button type="button" className={styles.nextBtn} onClick={() => setStep(s => Math.min(TOTAL_STEPS, s+1))}>
-                  {step === TOTAL_STEPS - 1 ? 'Tekshiruv →' : 'Keyingi →'}
-                </button>
+              ? (() => {
+                  // Qadam 2: SpO2 bo'sh bo'lsa — faqat ogohlantirish, bloklash yo'q (ixtiyoriy)
+                  // Qadam 5: hematoma bor + hematomaVolume bo'sh → bloklash
+                  const ctHasHematoma = form.ctFindings.includes('hematoma');
+                  const hemVolMissing = ctHasHematoma && form.hematomaVolume === undefined;
+                  const ctHasFracture = form.ctFindings.includes('fracture') || form.cchrAdditional.basalSkullFracture;
+                  const spO2MissingWithRisk = form.spO2 === undefined && (ctHasHematoma || ctHasFracture);
+                  const blockStep5 = step === 5 && (hemVolMissing || spO2MissingWithRisk);
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                      {step === 5 && hemVolMissing && (
+                        <span style={{ fontSize: 11, color: '#A32D2D' }}>
+                          ⛔ Gematoma aniqlangan — hajmini kiriting (ml)
+                        </span>
+                      )}
+                      {step === 5 && spO2MissingWithRisk && (
+                        <span style={{ fontSize: 11, color: '#A32D2D' }}>
+                          ⛔ Suyak sinishi/gematoma bor — SpO2 o'lchab kiriting (2-qadam)
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className={styles.nextBtn}
+                        disabled={blockStep5}
+                        style={blockStep5 ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
+                        onClick={() => !blockStep5 && setStep(s => Math.min(TOTAL_STEPS, s+1))}
+                      >
+                        {step === TOTAL_STEPS - 1 ? 'Tekshiruv →' : 'Keyingi →'}
+                      </button>
+                    </div>
+                  );
+                })()
               : <div />}
           </div>
         </form>
